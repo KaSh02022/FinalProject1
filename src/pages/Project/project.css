@@ -1,0 +1,2074 @@
+/* =========================================================
+   COMPONENTS.CSS
+   Style cho từng "khối giao diện" tái sử dụng nhiều lần:
+   Stat Card, Project Card, Kanban Board, Task Card, Modal,
+   Dropdown, Table/List, Filter Bar, Pagination, Empty State,
+   Calendar, Activity Timeline, Progress Bar, Tabs, Toast...
+   ========================================================= */
+
+/* =========================
+   STAT CARD (Dashboard)
+   ========================================================= */
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+}
+
+.stat-card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 18px;
+}
+.stat-card-icon.tone-primary { background: var(--color-primary-50); color: var(--color-primary-600); }
+.stat-card-icon.tone-warning { background: var(--color-warning-bg); color: var(--color-warning); }
+.stat-card-icon.tone-success { background: var(--color-success-bg); color: var(--color-success); }
+.stat-card-icon.tone-danger { background: var(--color-danger-bg); color: var(--color-danger); }
+
+.stat-card-label {
+    font-size: 12.5px;
+    color: var(--color-text-muted);
+}
+.stat-card-value {
+    font-size: 22px;
+    font-weight: 600;
+}
+
+.grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+}
+
+.grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+}
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4);
+}
+
+.panel {
+    padding: var(--space-4);
+}
+
+.panel-title {
+    margin-bottom: var(--space-3);
+}
+
+.panel-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--color-border);
+    font-size: 13px;
+}
+.panel-row:last-child {
+    border-bottom: none;
+}
+
+/* =========================
+   PROGRESS BAR
+   ========================================================= */
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-surface-hover);
+    overflow: hidden;
+}
+.progress-bar-fill {
+    height: 100%;
+    background-color: var(--color-primary-600);
+    border-radius: var(--radius-full);
+}
+
+/* =========================
+   DONUT CHART (SVG đơn giản)
+   ========================================================= */
+.donut-chart-wrap {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+}
+.donut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    font-size: 12.5px;
+}
+.donut-legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+.donut-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+/* =========================
+   PROJECT CARD (trang Projects)
+   ========================================================= */
+.project-card {
+    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    transition: box-shadow .15s ease;
+}
+.project-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.project-card-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.project-card-desc {
+    font-size: 12.5px;
+    color: var(--color-text-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.project-card-progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11.5px;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-1);
+}
+
+.project-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: var(--space-1);
+}
+
+/* =========================
+   KANBAN BOARD
+   ========================================================= */
+.board {
+    display: flex;
+    gap: var(--space-4);
+    overflow-x: auto;
+    padding-bottom: var(--space-4);
+    align-items: flex-start;
+}
+
+.board-column {
+    width: 300px;
+    flex-shrink: 0;
+    background-color: var(--color-surface-hover);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+}
+
+.board-column-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-3) var(--space-2);
+}
+
+.board-column-title {
+    font-size: 13px;
+    font-weight: 600;
+    flex: 1;
+}
+
+.board-column-count {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    padding: 1px 8px;
+    color: var(--color-text-muted);
+}
+
+.board-column-body {
+    flex: 1;
+    padding: 0 var(--space-2) var(--space-2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-height: 40px;
+}
+
+/* Vùng cột đang được kéo task vào (drag-over) */
+.board-column-body.drag-over {
+    background-color: var(--color-primary-50);
+    border-radius: var(--radius-md);
+}
+
+/* =========================
+   TASK CARD (thẻ công việc trong Kanban)
+   ========================================================= */
+.task-card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    cursor: grab;
+    box-shadow: var(--shadow-sm);
+}
+.task-card:hover {
+    border-color: var(--color-border-strong);
+}
+.task-card.dragging {
+    opacity: 0.5;
+}
+
+.task-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.task-card-title {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.task-card-labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+
+.label-chip {
+    font-size: 10.5px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: var(--radius-sm);
+}
+
+.task-card-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: var(--space-1);
+}
+
+.task-card-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: 11.5px;
+    color: var(--color-text-muted);
+}
+
+.task-card-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.due-overdue { color: var(--color-danger); }
+.due-today { color: var(--color-warning); }
+
+/* Nút "+ Add Task" cuối mỗi cột */
+.add-task-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    margin: 0 var(--space-2) var(--space-2);
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    font-size: 12.5px;
+    font-weight: 500;
+    border: 1px dashed var(--color-border-strong);
+}
+.add-task-btn:hover {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+}
+
+.add-task-form {
+    margin: 0 var(--space-2) var(--space-2);
+    padding: var(--space-2);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+.add-task-form-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* =========================
+   FILTER BAR
+   ========================================================= */
+.filter-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: nowrap; /* Giữ tất cả trên 1 hàng ngang */
+    margin-bottom: var(--space-4);
+    width: 100%;
+}
+
+.filter-bar .input-icon-wrap {
+    width: 220px;
+    flex-shrink: 0;
+}
+
+.filter-bar .select {
+    width: auto;
+    min-width: 140px;
+    flex-shrink: 0;
+}
+
+.filter-bar .btn-primary {
+    margin-left: auto; /* Đẩy nút "+ Thêm task" về góc phải */
+    flex-shrink: 0;
+}
+
+.filter-chips {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    flex-wrap: wrap;
+}
+
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.filter-chip button {
+    display: inline-flex;
+}
+
+.filter-clear-link {
+    font-size: 12px;
+    color: var(--color-primary-600);
+    font-weight: 500;
+}
+
+/* =========================
+   TASK LIST ROW (dạng bảng danh sách task)
+   ========================================================= */
+.task-list {
+    overflow: hidden;
+}
+
+.task-list-row {
+    display: grid;
+    /* grid-template-columns: 1fr 120px 90px 110px; */
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 13px;
+    text-align: left;
+}
+.task-list-row:last-child {
+    border-bottom: none;
+}
+.task-list-row:hover {
+    background-color: var(--color-surface-hover);
+}
+
+.task-list-row-header {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--color-text-subtle);
+    font-weight: 600;
+    background-color: var(--color-surface-hover);
+}
+.task-list-row-header:hover {
+    background-color: var(--color-surface-hover);
+}
+
+.task-title-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.task-title-cell-project {
+    font-size: 11.5px;
+    color: var(--color-text-subtle);
+}
+
+/* =========================
+   MEMBER TABLE (trang Members / Admin Users)
+   ========================================================= */
+.member-row {
+    display: grid;
+    grid-template-columns: 1fr 110px 90px 40px;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+}
+.member-row:last-child {
+    border-bottom: none;
+}
+
+.member-identity {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+.member-identity-text {
+    display: flex;
+    flex-direction: column;
+}
+.member-name {
+    font-size: 13px;
+    font-weight: 500;
+}
+.member-email {
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+/* =========================
+   PAGINATION
+   ========================================================= */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    font-size: 12.5px;
+    color: var(--color-text-muted);
+}
+.pagination-pages {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+.pagination-page-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-md);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12.5px;
+}
+.pagination-page-btn:hover {
+    background-color: var(--color-surface-hover);
+}
+.pagination-page-btn.active {
+    background-color: var(--color-primary-600);
+    color: #fff;
+}
+
+/* =========================
+   EMPTY STATE / ERROR STATE
+   ========================================================= */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: var(--space-6);
+    gap: var(--space-2);
+}
+.empty-state-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: var(--color-surface-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    margin-bottom: var(--space-2);
+}
+.empty-state-title {
+    font-weight: 600;
+    font-size: 14px;
+}
+.empty-state-desc {
+    font-size: 12.5px;
+    color: var(--color-text-muted);
+    max-width: 320px;
+}
+
+/* =========================
+   MODAL
+   ========================================================= */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px; /* Giúp modal không bị dính sát mép màn hình trên thiết bị nhỏ */
+}
+
+/* Khung Hộp Modal */
+.modal-box {
+    background: #ffffff;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh; /* Giới hạn chiều cao tối đa 90% màn hình */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Bo tròn góc chuẩn xác */
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Phần Header cố định */
+.modal-header {
+    padding: 20px 24px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+/* Phần Body có cuộn chuột nếu dài */
+.modal-body {
+    padding: 20px 24px;
+    overflow-y: auto; /* Tự động xuất hiện thanh cuộn khi nội dung quá dài */
+    flex: 1;
+}
+
+/* Phần Footer cố định chứa nút Action */
+.modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    background-color: #ffffff;
+}
+
+/* =========================
+   DRAWER (panel trượt từ bên phải - Task Detail)
+   ========================================================= */
+.drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgb(15 23 42 / 0.45);
+    z-index: 100;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.drawer-panel {
+    width: 100%;
+    max-width: 672px;
+    height: 100%;
+    background-color: var(--color-surface);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+}
+.drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+.drawer-field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+}
+
+/* =========================
+   DROPDOWN
+   ========================================================= */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 180px;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    padding: var(--space-2);
+    z-index: 50;
+}
+.dropdown-menu.align-left {
+    right: auto;
+    left: 0;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    text-align: left;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+}
+.dropdown-item:hover {
+    background-color: var(--color-surface-hover);
+}
+.dropdown-item.danger {
+    color: var(--color-danger);
+}
+
+.dropdown-separator {
+    height: 1px;
+    background-color: var(--color-border);
+    margin: var(--space-2) 0;
+}
+
+/* =========================
+   TABS / PILL TABS
+   ========================================================= */
+.pill-tabs {
+    display: inline-flex;
+    background-color: var(--color-surface-hover);
+    border-radius: var(--radius-md);
+    padding: 3px;
+    gap: 2px;
+    margin-bottom: var(--space-4);
+}
+.pill-tab {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+.pill-tab.active {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-sm);
+}
+
+/* =========================
+   CALENDAR GRID
+   ========================================================= */
+.calendar-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-4);
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border-top: 1px solid var(--color-border);
+    border-left: 1px solid var(--color-border);
+}
+
+.calendar-weekday {
+    padding: var(--space-2);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--color-text-subtle);
+    text-align: center;
+    border-bottom: 1px solid var(--color-border);
+    background-color: var(--color-surface-hover);
+}
+
+.calendar-cell {
+    min-height: 96px;
+    border-right: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-2);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.calendar-cell.outside {
+    background-color: var(--color-surface-hover);
+    color: var(--color-text-subtle);
+}
+
+.calendar-date-num {
+    font-size: 12px;
+    font-weight: 500;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+.calendar-cell.today .calendar-date-num {
+    background-color: var(--color-primary-600);
+    color: #fff;
+}
+
+.calendar-task-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10.5px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background-color: var(--color-surface-hover);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+
+/* =========================
+   ACTIVITY TIMELINE
+   ========================================================= */
+.timeline {
+    display: flex;
+    flex-direction: column;
+}
+
+.timeline-item {
+    display: flex;
+    gap: var(--space-3);
+    padding-bottom: var(--space-4);
+    position: relative;
+}
+.timeline-item:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 13px;
+    top: 28px;
+    bottom: 0;
+    width: 1px;
+    background-color: var(--color-border);
+}
+
+.timeline-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background-color: var(--color-primary-50);
+    color: var(--color-primary-600);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    z-index: 1;
+}
+
+.timeline-content {
+    font-size: 13px;
+    padding-top: 2px;
+}
+.timeline-time {
+    font-size: 11.5px;
+    color: var(--color-text-subtle);
+    margin-top: 2px;
+}
+
+/* =========================
+   COMMENTS / CHECKLIST (Task Drawer)
+   ========================================================= */
+.checklist-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) 0;
+    font-size: 13px;
+}
+.checklist-item.done .checklist-text {
+    text-decoration: line-through;
+    color: var(--color-text-subtle);
+}
+
+.comment-item {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+.comment-bubble {
+    background-color: var(--color-surface-hover);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    font-size: 12.5px;
+}
+.comment-author-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: 3px;
+}
+.comment-author {
+    font-weight: 600;
+    font-size: 12.5px;
+}
+.comment-time {
+    font-size: 11px;
+    color: var(--color-text-subtle);
+}
+
+/* =========================
+   TOAST (thông báo góc phải dưới)
+   ========================================================= */
+.toast-viewport {
+    position: fixed;
+    bottom: var(--space-5);
+    right: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    z-index: 200;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    padding: var(--space-3) var(--space-4);
+    font-size: 13px;
+    min-width: 240px;
+    animation: toast-in .15s ease-out;
+}
+.toast-success { border-left: 3px solid var(--color-success); }
+.toast-danger { border-left: 3px solid var(--color-danger); }
+.toast-info { border-left: 3px solid var(--color-info); }
+
+@keyframes toast-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================
+   SKELETON (trạng thái loading)
+   ========================================================= */
+.skeleton {
+    background-color: var(--color-surface-hover);
+    border-radius: var(--radius-md);
+    position: relative;
+    overflow: hidden;
+}
+.skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.6), transparent);
+    animation: skeleton-sweep 1.3s infinite;
+}
+@keyframes skeleton-sweep {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+}
+
+/* =========================
+   PERMISSION DENIED (khi không đủ quyền)
+   ========================================================= */
+.permission-denied {
+    text-align: center;
+    padding: var(--space-6);
+    color: var(--color-text-muted);
+}
+
+/* =========================================================
+   LAYOUT.CSS
+   Chứa cấu trúc khung sườn của toàn bộ ứng dụng:
+   - App Shell (Sidebar + Header + khu vực nội dung chính)
+   - Sidebar (menu điều hướng bên trái)
+   - Header (thanh trên cùng)
+   - Project sub-nav (tab Board/List/Calendar/Activity/Settings)
+   ========================================================= */
+
+/* =========================
+   APP SHELL
+   Bố cục tổng: sidebar bên trái + (header + nội dung) bên phải.
+   Dùng flexbox theo hàng ngang (row).
+   ========================================================= */
+.app-shell {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0; /* tránh nội dung tràn ra khi có bảng/kanban rộng */
+}
+
+.page-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-6);
+}
+
+/* =========================
+   SIDEBAR
+   Menu điều hướng chính, nằm cố định bên trái.
+   ========================================================= */
+.sidebar {
+    width: var(--sidebar-width);
+    flex-shrink: 0;
+    background-color: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Logo + tên ứng dụng, nằm trên cùng của sidebar */
+.sidebar-brand {
+    height: var(--header-height);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 0 var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.sidebar-brand-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-md);
+    background-color: var(--color-primary-600);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.sidebar-brand-name {
+    font-weight: 600;
+    font-size: 15px;
+}
+
+/* Tên workspace hiện tại */
+.sidebar-workspace {
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+}
+.sidebar-workspace-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--color-text-subtle);
+    margin-bottom: var(--space-1);
+}
+.sidebar-workspace-name {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* Danh sách menu item */
+.sidebar-nav {
+    flex: 1;
+    padding: var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    overflow-y: auto;
+}
+
+.sidebar-section-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--color-text-subtle);
+    padding: var(--space-3) var(--space-3) var(--space-1);
+}
+
+/* Một mục menu (icon + chữ) */
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    height: 38px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    font-size: 13.5px;
+    font-weight: 500;
+}
+.nav-item:hover {
+    background-color: var(--color-surface-hover);
+    color: var(--color-text);
+}
+
+/* Menu item đang được chọn (trang hiện tại) */
+.nav-item.active {
+    background-color: var(--color-primary-600);
+    color: #fff;
+}
+
+.nav-item-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* =========================
+   HEADER
+   Thanh ngang trên cùng của khu vực nội dung.
+   ========================================================= */
+.header {
+    height: var(--header-height);
+    flex-shrink: 0;
+    background-color: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--space-5);
+    gap: var(--space-4);
+}
+
+.header-search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 36px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-subtle);
+    font-size: 13px;
+    width: 280px;
+}
+
+.header-search kbd {
+    margin-left: auto;
+    font-size: 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--color-text-subtle);
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+/* =========================
+   PAGE HEADER (dùng ở đầu mỗi trang nội dung)
+   ========================================================= */
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-6);
+    gap: var(--space-4);
+    flex-wrap: wrap;
+}
+
+/* =========================
+   PROJECT SUB-HEADER + TAB NAV
+   Dùng trong trang chi tiết dự án (project-board, project-list, ...)
+   ========================================================= */
+.project-header {
+    padding: var(--space-5) var(--space-6) 0;
+    background-color: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.project-header-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.project-title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.project-color-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.project-meta-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    margin-top: var(--space-2);
+    color: var(--color-text-muted);
+    font-size: 12.5px;
+}
+
+.project-meta-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+/* Thanh tab: Board / List / Calendar / Activity / Settings */
+.project-tabs {
+    display: flex;
+    gap: var(--space-5);
+}
+
+.project-tab {
+    padding: var(--space-3) 0;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    border-bottom: 2px solid transparent;
+}
+.project-tab:hover {
+    color: var(--color-text);
+}
+.project-tab.active {
+    color: var(--color-primary-600);
+    border-bottom-color: var(--color-primary-600);
+}
+
+/* =========================
+   SETTINGS LAYOUT (2 cột: menu trái + form phải)
+   ========================================================= */
+.settings-layout {
+    display: flex;
+    gap: var(--space-6);
+    align-items: flex-start;
+}
+
+.settings-nav {
+    width: 200px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.settings-nav-item {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+.settings-nav-item:hover {
+    background-color: var(--color-surface-hover);
+}
+.settings-nav-item.active {
+    background-color: var(--color-primary-50);
+    color: var(--color-primary-700);
+}
+
+.settings-content,
+.settings-section,
+.card {
+    width: 100% !important;
+    max-width: none !important; /* Hủy bỏ max-width cũ */
+}
+.settings-section.active {
+    display: block;
+}
+
+/* =========================================================
+   RESPONSIVE.CSS
+   Điều chỉnh giao diện cho màn hình nhỏ hơn (tablet, mobile).
+   Quy tắc chung: viết CSS "desktop-first" rồi dùng
+   max-width để thu gọn dần cho màn hình nhỏ.
+   ========================================================= */
+
+/* =========================
+   TABLET (<= 1024px)
+   Thu gọn sidebar chỉ còn icon, ẩn chữ.
+   ========================================================= */
+@media (max-width: 1024px) {
+    .sidebar {
+        width: var(--sidebar-width-collapsed);
+    }
+    .sidebar-brand-name,
+    .sidebar-workspace,
+    .sidebar-section-label,
+    .nav-item span {
+        display: none;
+    }
+    .nav-item {
+        justify-content: center;
+    }
+
+    .grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .grid-3 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .header-search {
+        width: 200px;
+    }
+}
+
+/* =========================
+   MOBILE (<= 768px)
+   Ẩn hẳn sidebar, dùng menu ẩn/hiện (hamburger) qua JavaScript.
+   ========================================================= */
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        z-index: 150;
+        width: 260px;
+        transform: translateX(-100%);
+        transition: transform .2s ease;
+    }
+    .sidebar.mobile-open {
+        transform: translateX(0);
+        box-shadow: var(--shadow-lg);
+    }
+    .sidebar-brand-name,
+    .sidebar-workspace,
+    .sidebar-section-label,
+    .nav-item span {
+        display: block;
+    }
+    .nav-item {
+        justify-content: flex-start;
+    }
+
+    .mobile-menu-btn {
+        display: inline-flex;
+    }
+
+    .header-search {
+        display: none;
+    }
+
+    .grid-4,
+    .grid-3,
+    .grid-2 {
+        grid-template-columns: 1fr;
+    }
+
+    .page-content {
+        padding: var(--space-4);
+    }
+
+    .settings-layout {
+        flex-direction: column;
+    }
+    .settings-nav {
+        width: 100%;
+        flex-direction: row;
+        overflow-x: auto;
+    }
+
+    .task-list-row,
+    .task-list-row-header {
+        grid-template-columns: 1fr 90px;
+    }
+    .task-list-row-header span:nth-child(3),
+    .task-list-row-header span:nth-child(4),
+    .task-list-row .task-list-assignees,
+    .task-list-row .task-list-due {
+        display: none;
+    }
+
+    .member-row {
+        grid-template-columns: 1fr 40px;
+    }
+    .member-row .member-role,
+    .member-row .member-tasks {
+        display: none;
+    }
+
+    .drawer-panel {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .drawer-field-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .board-column {
+        width: 260px;
+    }
+}
+
+/* Nút hamburger mở menu mobile - mặc định ẩn, chỉ hiện ở mobile */
+.mobile-menu-btn {
+    display: none;
+}
+
+/* Lớp phủ tối phía sau sidebar khi mở trên mobile */
+.sidebar-overlay {
+    display: none;
+}
+@media (max-width: 768px) {
+    .sidebar-overlay.show {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgb(15 23 42 / 0.4);
+        z-index: 140;
+    }
+}
+
+/* =========================================================
+   STYLE.CSS
+   File này chứa:
+   - Design Tokens (biến màu, khoảng cách, bo góc, đổ bóng)
+   - CSS Reset cơ bản
+   - Typography (kiểu chữ chung)
+   - Các thành phần dùng chung nhiều nơi: button, badge, avatar, form
+   Học theo thứ tự từ trên xuống dưới sẽ dễ hiểu nhất.
+   ========================================================= */
+
+/* =========================
+   1. DESIGN TOKENS
+   Đây là các "biến CSS" (CSS Variables).
+   Thay vì viết mã màu #4f46e5 lặp lại ở nhiều nơi,
+   ta đặt tên cho nó là --color-primary-600 rồi dùng lại.
+   Muốn đổi theme toàn bộ trang, chỉ cần sửa ở đây.
+   ========================================================= */
+:root {
+    /* Màu thương hiệu (Primary - Indigo) */
+    --color-primary-50: #eef2ff;
+    --color-primary-100: #e0e7ff;
+    --color-primary-200: #c7d2fe;
+    --color-primary-500: #6366f1;
+    --color-primary-600: #4f46e5; /* Màu chủ đạo: nút, active menu, logo */
+    --color-primary-700: #4338ca;
+
+    /* Màu trung tính (nền, chữ, viền) */
+    --color-bg: #f8fafc;             /* Nền toàn trang */
+    --color-surface: #ffffff;        /* Nền của card / sidebar / header */
+    --color-surface-hover: #f1f5f9;
+    --color-border: #e2e8f0;
+    --color-border-strong: #cbd5e1;
+    --color-text: #0f172a;           /* Chữ chính */
+    --color-text-muted: #64748b;     /* Chữ phụ, mô tả */
+    --color-text-subtle: #94a3b8;    /* Chữ mờ nhất, ví dụ placeholder */
+
+    /* Màu trạng thái (Semantic colors) */
+    --color-success: #16a34a;
+    --color-success-bg: #f0fdf4;
+    --color-success-border: #bbf7d0;
+
+    --color-warning: #f59e0b;
+    --color-warning-bg: #fffbeb;
+    --color-warning-border: #fde68a;
+
+    --color-danger: #dc2626;
+    --color-danger-bg: #fef2f2;
+    --color-danger-border: #fecaca;
+
+    --color-info: #2563eb;
+    --color-info-bg: #eff6ff;
+    --color-info-border: #bfdbfe;
+
+    /* Màu độ ưu tiên của Task */
+    --color-priority-urgent: #dc2626;
+    --color-priority-urgent-bg: #fef2f2;
+    --color-priority-high: #f97316;
+    --color-priority-high-bg: #fff7ed;
+    --color-priority-medium: #f59e0b;
+    --color-priority-medium-bg: #fffbeb;
+    --color-priority-low: #2563eb;
+    --color-priority-low-bg: #eff6ff;
+
+    /* Bo góc (Border radius) */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 10px;
+    --radius-xl: 12px;
+    --radius-full: 999px;
+
+    /* Đổ bóng (Shadow) */
+    --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.06);
+    --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.06);
+    --shadow-lg: 0 12px 24px -4px rgb(15 23 42 / 0.1), 0 4px 8px -4px rgb(15 23 42 / 0.06);
+
+    /* Kích thước layout dùng chung */
+    --sidebar-width: 260px;
+    --sidebar-width-collapsed: 72px;
+    --header-height: 60px;
+
+    /* Khoảng cách (spacing) dùng chung, đơn vị dựa trên bội số của 4px */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+}
+
+/* =========================
+   2. RESET CƠ BẢN
+   Trình duyệt có style mặc định khác nhau cho từng thẻ,
+   reset để chúng ta chủ động kiểm soát giao diện.
+   ========================================================= */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+ul, ol {
+    list-style: none;
+}
+
+button {
+    font-family: inherit;
+    font-size: inherit;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: inherit;
+}
+
+img, svg {
+    display: block;
+    max-width: 100%;
+}
+
+input, textarea, select {
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+}
+
+/* =========================
+   3. TYPOGRAPHY
+   Các cấp tiêu đề dùng chung trong toàn bộ project học.
+   ========================================================= */
+h1 {
+    font-size: 22px;
+    font-weight: 600;
+}
+
+h2 {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+h3 {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.page-subtitle {
+    color: var(--color-text-muted);
+    font-size: 13px;
+    margin-top: var(--space-1);
+}
+
+.text-muted {
+    color: var(--color-text-muted);
+}
+
+.text-subtle {
+    color: var(--color-text-subtle);
+}
+
+/* =========================
+   4. BUTTON
+   Class dùng chung: .btn
+   Thêm biến thể: .btn-primary, .btn-secondary, .btn-outline, .btn-ghost, .btn-danger
+   Thêm kích thước: .btn-sm, .btn-lg
+   ========================================================= */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    height: 36px;
+    padding: 0 var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background-color .15s ease, border-color .15s ease;
+}
+
+.btn-primary {
+    background-color: var(--color-primary-600);
+    color: #fff;
+}
+.btn-primary:hover {
+    background-color: var(--color-primary-700);
+}
+
+.btn-secondary {
+    background-color: var(--color-surface-hover);
+    color: var(--color-text);
+}
+.btn-secondary:hover {
+    background-color: var(--color-border);
+}
+
+.btn-outline {
+    background-color: transparent;
+    border: 1px solid var(--color-border-strong);
+    color: var(--color-text);
+}
+.btn-outline:hover {
+    background-color: var(--color-surface-hover);
+}
+
+.btn-ghost {
+    background-color: transparent;
+    color: var(--color-text-muted);
+}
+.btn-ghost:hover {
+    background-color: var(--color-surface-hover);
+}
+
+.btn-danger {
+    background-color: var(--color-danger);
+    color: #fff;
+}
+.btn-danger:hover {
+    background-color: #b91c1c;
+}
+
+.btn-sm {
+    height: 30px;
+    padding: 0 var(--space-3);
+    font-size: 12.5px;
+}
+
+.btn-full {
+    width: 100%;
+}
+
+.btn-icon {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: var(--radius-md);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+}
+.btn-icon:hover {
+    background-color: var(--color-surface-hover);
+}
+
+/* =========================
+   5. BADGE
+   Dùng cho: trạng thái dự án, vai trò thành viên, độ ưu tiên...
+   ========================================================= */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    height: 22px;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-md);
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid transparent;
+}
+
+.badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: currentColor;
+}
+
+.badge-neutral {
+    background-color: var(--color-surface-hover);
+    color: var(--color-text-muted);
+    border-color: var(--color-border);
+}
+.badge-success {
+    background-color: var(--color-success-bg);
+    color: var(--color-success);
+    border-color: var(--color-success-border);
+}
+.badge-warning {
+    background-color: var(--color-warning-bg);
+    color: var(--color-warning);
+    border-color: var(--color-warning-border);
+}
+.badge-danger {
+    background-color: var(--color-danger-bg);
+    color: var(--color-danger);
+    border-color: var(--color-danger-border);
+}
+.badge-info {
+    background-color: var(--color-info-bg);
+    color: var(--color-info);
+    border-color: var(--color-info-border);
+}
+.badge-primary {
+    background-color: var(--color-primary-50);
+    color: var(--color-primary-700);
+    border-color: var(--color-primary-200);
+}
+
+/* Badge độ ưu tiên task */
+.badge-priority-urgent { background: var(--color-priority-urgent-bg); color: var(--color-priority-urgent); }
+.badge-priority-high { background: var(--color-priority-high-bg); color: var(--color-priority-high); }
+.badge-priority-medium { background: var(--color-priority-medium-bg); color: var(--color-priority-medium); }
+.badge-priority-low { background: var(--color-priority-low-bg); color: var(--color-priority-low); }
+
+/* =========================
+   6. AVATAR
+   Hình đại diện dạng vòng tròn hiển thị chữ viết tắt tên.
+   Màu nền được set bằng inline style (style="background:#..") trong HTML.
+   ========================================================= */
+.avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+.avatar-sm {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+}
+.avatar-lg {
+    width: 44px;
+    height: 44px;
+    font-size: 15px;
+}
+
+/* Nhóm avatar xếp chồng lên nhau */
+.avatar-group {
+    display: flex;
+}
+.avatar-group .avatar {
+    border: 2px solid var(--color-surface);
+    margin-left: -8px;
+}
+.avatar-group .avatar:first-child {
+    margin-left: 0;
+}
+
+/* =========================
+   7. FORM (input, textarea, select, checkbox, label)
+   ========================================================= */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+}
+
+.form-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+.input,
+.textarea,
+.select {
+    width: 100%;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+}
+
+.textarea {
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: 1px;
+    border-color: var(--color-primary-500);
+}
+
+.input::placeholder,
+.textarea::placeholder {
+    color: var(--color-text-subtle);
+}
+
+.checkbox {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-primary-600);
+}
+
+.form-hint {
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+/* Input có icon bên trong (dùng cho ô tìm kiếm) */
+.input-icon-wrap {
+    position: relative;
+}
+.input-icon-wrap .input {
+    padding-left: 34px;
+}
+.input-icon-wrap .input-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-subtle);
+    width: 16px;
+    height: 16px;
+}
+
+/* =========================
+   8. TIỆN ÍCH DÙNG CHUNG (utility nhỏ, không lạm dụng)
+   ========================================================= */
+.card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+}
+
+.hidden {
+    display: none !important;
+}
+
+.scroll-x {
+    overflow-x: auto;
+}
+
+/* ============ KANBAN CONTAINER (SCROLL NGANG CHO CỘT) ============ */
+.board.scroll-x {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    height: calc(100vh - 200px); /* Tùy chỉnh theo Layout */
+}
+
+/* Tùy chỉnh thanh cuộn ngang mượt đẹp */
+.board.scroll-x::-webkit-scrollbar {
+    height: 8px;
+}
+.board.scroll-x::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+.board.scroll-x::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+.board.scroll-x::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* ============ CỘT KANBAN (BOARD COLUMN) ============ */
+.board-column {
+    width: 300px;
+    min-width: 300px;         /* Đảm bảo cột không bị co nhỏ lại */
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    background-color: #f8fafc;
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+/* ============ THÂN CỘT (SCROLL DỌC CHO DANH SÁCH TASK) ============ */
+.board-column-body {
+    max-height: calc(100vh - 280px);
+    overflow-y: auto;
+    /* Giúp thao tác kéo mượt hơn trên thiết bị cảm ứng */
+    touch-action: pan-y;
+}
+
+/* Tùy chỉnh thanh cuộn dọc bên trong cột */
+.board-column-body::-webkit-scrollbar {
+    width: 6px;
+}
+.board-column-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+.board-column-body::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+.board-column-body::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Khung chứa thanh tiến độ */
+.progress-bar {
+    width: 100%;
+    height: 8px; /* Tăng độ dày một chút để nhìn rõ màu */
+    background-color: #e2e8f0; /* Màu nền xám nhạt */
+    border-radius: 9999px;
+    overflow: hidden;
+    margin-top: 6px;
+}
+
+/* Thanh fill tiến độ */
+.progress-bar-fill {
+    height: 100%;
+    border-radius: 9999px;
+    /* Hiệu ứng chuyển động mượt khi width thay đổi */
+    transition: width 0.4s ease-in-out, background-color 0.3s ease;
+}
+
+/* Các lớp màu tương ứng với % */
+.progress-bar-fill.low {
+    background-color: #f59e0b; /* Cam đậm cho tiến độ thấp (< 30%) */
+}
+
+.progress-bar-fill.medium {
+    background-color: #3b82f6; /* Xanh dương cho tiến độ trung bình (30% - 79%) */
+}
+
+.progress-bar-fill.high {
+    background-color: #10b981; /* Xanh lá đậm cho tiến độ cao/hoàn thành (>= 80%) */
+}
+
+/* Đảm bảo phần đáy card task căn chỉnh linh hoạt giữa meta và avatar */
+.task-card-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+    gap: 8px;
+}
+
+/* Nhóm các avatar xếp chồng ở góc dưới bên phải */
+.task-assignees-group {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+/* Đĩa Avatar đại diện cho từng người dùng */
+.task-assignee-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background-color: #4f46e5;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #ffffff;
+    margin-left: -6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    text-transform: uppercase;
+    user-select: none;
+}
+
+.task-assignees-group .task-assignee-avatar:first-child {
+    margin-left: 0;
+}
+
+
+.auth-wrap.size-lg {
+    max-width: 440px;
+        margin-top: 138px;
+}
+.auth-wrap {
+    width: 100%;
+    max-width: 400px;
+    margin: auto;
+}
+.auth-card {
+    padding: var(--space-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    box-shadow: var(--shadow-sm);
+}
+.card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+}
+.auth-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+}
+.auth-brand-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    text-align: center;
+    margin-bottom: var(--space-6);
+}
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+.auth-wrap { width: 100%; max-width: 400px; }
+.auth-wrap.size-lg { max-width: 440px; }
+.auth-brand-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+.auth-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-xl);
+  background-color: var(--color-primary-600);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+}
+.auth-card {
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+.auth-card .field { margin-bottom: 0; }
+
+.social-row { display: flex; gap: var(--space-2); }
+.social-btn { flex: 1; }
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 12px;
+  color: var(--color-text-subtle);
+}
+.auth-divider span { flex: 1; height: 1px; background-color: var(--color-border); }
+
+.password-field-wrap { position: relative; }
+.password-field-wrap .input { padding-right: 40px; }
+.password-toggle-btn { position: absolute; right: 4px; top: 4px; }
+
+.field-checkbox-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); }
+.checkbox-label { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; }
+.checkbox-label .checkbox { margin-top: 2px; }
+
+.auth-inline-link { color: var(--color-primary-600); font-weight: 500; }
+.auth-inline-link:hover { text-decoration: underline; }
+
+.auth-footer-text { margin-top: var(--space-4); text-align: center; font-size: 14px; color: var(--color-text-muted); }
+
+.auth-demo-block { margin-top: var(--space-6); }
+.auth-demo-label {
+  text-align: center;
+  margin-bottom: var(--space-2);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--color-text-subtle);
+}
+.auth-demo-list { display: flex; flex-direction: column; gap: 8px; }
+.auth-demo-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px var(--space-3);
+  text-align: left;
+}
+.auth-demo-row-name { display: block; font-size: 14px; font-weight: 500; }
+.auth-demo-row-role { display: block; font-size: 12px; color: var(--color-text-muted); }

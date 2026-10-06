@@ -1,0 +1,12 @@
+ .home-wrap { max-width: 900px; margin: 0 auto; padding: 56px 24px; }
+    .home-hero { text-align: center; margin-bottom: 40px; }
+    .home-hero h1 { font-size: 26px; margin-bottom: 8px; }
+    .screen-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-bottom: 40px; }
+    .screen-card { display: flex; flex-direction: column; gap: 6px; padding: 16px; }
+    .screen-card .num { font-size: 11px; color: var(--color-text-subtle); font-weight: 600; }
+    .learn-order li { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--color-border); font-size: 14px; }
+    .learn-order li:last-child { border-bottom: none; }
+    .learn-order .step-num {
+      width: 24px; height: 24px; border-radius: 50%; background: var(--color-primary-600); color: #fff;
+      display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0;
+    }

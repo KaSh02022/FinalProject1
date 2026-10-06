@@ -1,0 +1,488 @@
+/* =========================================================
+   STYLE.CSS
+   This file contains:
+   - Design tokens (color, spacing, radius, shadow variables)
+   - A basic CSS reset
+   - Typography
+   - Shared primitives: button, badge, avatar, form fields, icon
+   These values are copied from the original React app's design
+   tokens (src/styles/tokens.css) so this HTML version keeps the
+   exact same colors, radii, and shadows..filter-bar
+   ========================================================= */
+
+/* =========================
+   1. DESIGN TOKENS
+   CSS custom properties ("variables"). Instead of repeating a
+   color like #4f46e5 everywhere, we give it a name once here.
+   ========================================================= */
+:root {
+  /* Brand color (indigo) — full scale, same as the React tokens */
+  --color-primary-50: #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-400: #818cf8;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5; /* main brand color: buttons, active nav, logo */
+  --color-primary-700: #4338ca;
+  --color-primary-800: #3730a3;
+  --color-primary-900: #312e81;
+
+  /* Neutral (slate) colors — background, text, borders */
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+  --color-text-subtle: #94a3b8;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-700: #334155;
+  --color-slate-900: #0f172a;
+
+  /* Semantic colors (status) */
+  --color-success: #16a34a;
+  --color-success-bg: #f0fdf4;
+  --color-success-border: #bbf7d0;
+
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #fde68a;
+
+  --color-danger: #dc2626;
+  --color-danger-bg: #fef2f2;
+  --color-danger-border: #fecaca;
+
+  --color-info: #2563eb;
+  --color-info-bg: #eff6ff;
+  --color-info-border: #bfdbfe;
+
+  /* Task priority accent colors */
+  --color-priority-urgent: #dc2626;
+  --color-priority-urgent-bg: #fef2f2;
+  --color-priority-high: #f97316;
+  --color-priority-high-bg: #fff7ed;
+  --color-priority-medium: #f59e0b;
+  --color-priority-medium-bg: #fffbeb;
+  --color-priority-low: #2563eb;
+  --color-priority-low-bg: #eff6ff;
+
+  /* Border radius scale */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-full: 999px;
+
+  /* Shadows (subtle, no heavy/neon shadows — matches the React app) */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.06);
+  --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.06);
+  --shadow-lg: 0 12px 24px -4px rgb(15 23 42 / 0.1), 0 4px 8px -4px rgb(15 23 42 / 0.06);
+
+  /* Layout sizing (must match the React AppShell exactly) */
+  --sidebar-width: 260px;
+  --sidebar-width-collapsed: 72px;
+  --header-height: 60px;
+
+  /* Spacing scale (Tailwind's 4px-based scale, used the same way here) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+}
+
+/* =========================
+   2. RESET
+   ========================================================= */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul, ol {
+  list-style: none;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+::selection {
+  background-color: var(--color-primary-200);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Thin scrollbars, same treatment as the React app */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-strong);
+  border-radius: 999px;
+}
+
+/* =========================
+   3. TYPOGRAPHY
+   ========================================================= */
+h1 {
+  font-size: 22px;
+  font-weight: 600;
+}
+h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.page-subtitle {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  margin-top: 4px;
+}
+.text-muted { color: var(--color-text-muted); }
+.text-subtle { color: var(--color-text-subtle); }
+.text-danger { color: var(--color-danger); }
+
+/* =========================
+   4. ICON SYSTEM
+   Icons are injected by JavaScript (see js/main.js) using real
+   Lucide icon path data, so they look identical to the React app
+   without needing an npm package. In HTML you just write:
+     <span class="icon" data-icon="search"></span>
+   and main.js fills in the <svg> on page load.
+   ========================================================= */
+.icon svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: block;
+}
+.icon-xs svg { width: 12px; height: 12px; }
+.icon-sm svg { width: 14px; height: 14px; }
+.icon-md svg { width: 16px; height: 16px; }
+.icon-lg svg { width: 20px; height: 20px; }
+.icon-xl svg { width: 24px; height: 24px; }
+.icon-spin svg { animation: spin 1s linear infinite; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* =========================
+   5. BUTTON
+   .btn is the base class; add a variant + size modifier.
+   ========================================================= */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 36px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: var(--color-primary-600);
+  color: #fff;
+  box-shadow: var(--shadow-xs);
+}
+.btn-primary:hover:not(:disabled) { background-color: var(--color-primary-700); }
+.btn-primary:active:not(:disabled) { background-color: var(--color-primary-800); }
+
+.btn-secondary {
+  background-color: var(--color-slate-100);
+  color: var(--color-text);
+}
+.btn-secondary:hover:not(:disabled) { background-color: var(--color-slate-200); }
+
+.btn-outline {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text);
+}
+.btn-outline:hover:not(:disabled) { background-color: var(--color-surface-hover); }
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--color-text);
+}
+.btn-ghost:hover:not(:disabled) { background-color: var(--color-surface-hover); }
+
+.btn-danger {
+  background-color: var(--color-danger);
+  color: #fff;
+  box-shadow: var(--shadow-xs);
+}
+.btn-danger:hover:not(:disabled) { background-color: #b91c1c; }
+
+.btn-sm { height: 32px; padding: 0 var(--space-3); font-size: 13px; gap: 6px; }
+.btn-lg { height: 44px; padding: 0 var(--space-5); font-size: 15px; border-radius: var(--radius-lg); }
+.btn-full { width: 100%; }
+
+/* Icon-only square button (matches the React IconButton component) */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  transition: background-color .15s ease, color .15s ease;
+}
+.icon-btn:hover:not(:disabled) {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text);
+}
+.icon-btn-sm { width: 28px; height: 28px; }
+.icon-btn-lg { width: 44px; height: 44px; border-radius: var(--radius-lg); }
+.icon-btn-outline { border: 1px solid var(--color-border); }
+.icon-btn-solid { background-color: var(--color-primary-600); color: #fff; }
+.icon-btn-solid:hover { background-color: var(--color-primary-700); color: #fff; }
+.icon-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* =========================
+   6. BADGE
+   ========================================================= */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+  flex-shrink: 0;
+}
+.badge-neutral { background: var(--color-slate-100); color: var(--color-slate-700); border-color: var(--color-border); }
+.badge-primary { background: var(--color-primary-50); color: var(--color-primary-700); border-color: var(--color-primary-200); }
+.badge-success { background: var(--color-success-bg); color: var(--color-success); border-color: var(--color-success-border); }
+.badge-warning { background: var(--color-warning-bg); color: #b45309; border-color: var(--color-warning-border); }
+.badge-danger { background: var(--color-danger-bg); color: var(--color-danger); border-color: var(--color-danger-border); }
+.badge-info { background: var(--color-info-bg); color: var(--color-info); border-color: var(--color-info-border); }
+
+/* Priority badges get their color from inline style (see js/main.js priorityMeta) */
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--radius-md);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* =========================
+   7. AVATAR
+   Background color comes from inline style (per-user avatarColor).
+   ========================================================= */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 600;
+  flex-shrink: 0;
+  user-select: none;
+}
+.avatar-xs { width: 20px; height: 20px; font-size: 10px; }
+.avatar-sm { width: 24px; height: 24px; font-size: 11px; }
+.avatar-md { width: 32px; height: 32px; font-size: 12px; }
+.avatar-lg { width: 40px; height: 40px; font-size: 14px; }
+
+.avatar-group {
+  display: inline-flex;
+  align-items: center;
+}
+.avatar-group .avatar,
+.avatar-group .avatar-overflow {
+  margin-left: -6px;
+  border: 2px solid var(--color-surface);
+}
+.avatar-group .avatar:first-child { margin-left: 0; }
+.avatar-overflow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-slate-200);
+  color: var(--color-slate-700);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* =========================
+   8. FORM FIELDS
+   ========================================================= */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--space-4);
+}
+.field:last-child { margin-bottom: 0; }
+.field-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+.field-hint { font-size: 12px; color: var(--color-text-muted); }
+.field-error { font-size: 12px; color: var(--color-danger); }
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--space-3);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.textarea {
+  height: auto;
+  min-height: 80px;
+  padding: var(--space-2) var(--space-3);
+  resize: vertical;
+}
+.input:focus, .textarea:focus, .select:focus {
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+.input::placeholder, .textarea::placeholder { color: var(--color-text-subtle); }
+.input.has-error, .textarea.has-error { border-color: var(--color-danger); }
+
+.select {
+  appearance: none;
+  padding-right: 36px;
+  cursor: pointer;
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary-600);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.input-icon-wrap {
+  position: relative;
+}
+.input-icon-wrap .input { padding-left: 34px; }
+.input-icon-wrap .icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-subtle);
+  pointer-events: none;
+}
+
+.select-wrap {
+  position: relative;
+}
+.select-wrap .icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-subtle);
+  pointer-events: none;
+}
+
+/* =========================
+   9. SHARED LAYOUT HELPERS
+   ========================================================= */
+.card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+.hidden { display: none !important; }
+.scroll-x { overflow-x: auto; }
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
