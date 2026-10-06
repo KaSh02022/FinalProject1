@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
+import ErrorState from '../../../components/common/ErrorState.jsx';
+import { failureMessage } from '../../../utils/requestState.js';
 
 function KPI() {
     // 1. Khởi tạo State lưu đúng cấu trúc Object mà API trả về
@@ -8,6 +11,9 @@ function KPI() {
         onTimeRate: 0
     });
     const [loading, setLoading] = useState(true);
+    // Portfolio request failed: show the error, not 0 / 0% / $0. Bump reloadKey to retry.
+    const [loadError, setLoadError] = useState(null);
+    const [reloadKey, setReloadKey] = useState(0);
 
     // 2. Fetch dữ liệu từ API Portfolio
     useEffect(() => {
@@ -33,12 +39,34 @@ function KPI() {
         })
         .catch(err => {
             console.error("Lỗi khi đồng bộ dữ liệu KPI:", err);
+            setLoadError(err);
             setLoading(false);
         });
-    }, []);
+    }, [reloadKey]);
+
+    const retryLoad = () => {
+        setLoadError(null);
+        setLoading(true);
+        setReloadKey((k) => k + 1);
+    };
 
     if (loading) {
-        return <div className="text-xs text-slate-400 p-4">Đang tải số liệu hệ thống...</div>;
+        return (
+            <div className="page-loading" role="status" style={{ minHeight: 0, padding: 'var(--space-4) 0' }}>
+                <Loader2 className="icon animate-spin" aria-hidden="true" />
+                <span>Đang tải số liệu hệ thống...</span>
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <ErrorState
+                title="Couldn't load workspace statistics"
+                message={failureMessage({ error: loadError })}
+                onRetry={retryLoad}
+            />
+        );
     }
 
     return (

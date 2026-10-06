@@ -629,6 +629,45 @@ button.panel-row:hover { background-color: var(--color-surface-hover); }
 .empty-state-desc {
   font-size: 12.5px;
 }
+.error-state {
+  margin: var(--space-6) auto;
+  max-width: 480px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+.error-state-desc { overflow-wrap: anywhere; }
+/* partial failure: the page is usable but some data is missing */
+.error-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-warning-bg);
+  color: var(--color-priority-medium-text);
+  font-size: var(--text-sm);
+}
+.error-inline .icon { flex-shrink: 0; }
+.error-inline-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.error-inline-message { color: var(--color-text-muted); }
+/* full-page loading inside the shell */
+.page-loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 240px;
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+.page-loading .icon { width: 32px; height: 32px; color: var(--color-primary-600); }
 
 /* =========================
    MODAL
@@ -787,7 +826,8 @@ button.panel-row:hover { background-color: var(--color-surface-hover); }
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
   padding: var(--space-2);
-  z-index: 50;
+  z-index: var(--z-dropdown);
+  max-width: calc(100vw - 24px);
 }
 .dropdown-menu.align-left { right: auto; left: 0; }
 .dropdown-item {
@@ -808,7 +848,7 @@ button.panel-row:hover { background-color: var(--color-surface-hover); }
 .dropdown-note { padding: 8px 12px; font-size: 14px; color: var(--color-text-muted); }
 .dropdown-user-info { padding: 8px 12px; }
 .dropdown-user-name { font-size: 14px; font-weight: 600; }
-.dropdown-user-email { font-size: 12px; color: var(--color-text-muted); }
+.dropdown-user-email { font-size: 12px; color: var(--color-text-muted); overflow-wrap: anywhere; }
 .dropdown-user-role {
   margin-top: 4px;
   font-size: 11px;

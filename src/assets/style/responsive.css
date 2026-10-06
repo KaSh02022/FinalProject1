@@ -1,9 +1,10 @@
 /* =========================================================
    RESPONSIVE.CSS
-   Breakpoints match the ones Tailwind uses in the React app:
-   sm = 640px, md = 768px, lg = 1024px, xl = 1280px.
-   We write the desktop layout as the default in the other CSS
-   files, then narrow it down here for smaller screens.
+   The ONLY breakpoint system of the app (DEC-006):
+     xl < 1280px · lg < 1024px · md < 768px · sm < 640px
+   Desktop layout is the default in the other CSS files; this
+   file narrows it down. (Phase B merged the old 1024px/768px
+   media queries from pages/Project/project.css into here.)
    ========================================================= */
 
 /* =========================
@@ -16,14 +17,13 @@
 }
 
 /* =========================
-   LG and below (< 1024px)
-   - Dashboard's 3-column panel rows become a single column.
-   - Sidebar becomes an icon-only rail (tablet layout) with no
-     manual collapse toggle — this matches the React app, which
-     forces the sidebar into "collapsed" mode between 768–1023px.
+   LG and below (< 1024px) — tablet
+   Sidebar becomes an icon rail (no manual collapse toggle);
+   4/3-column grids become 2 columns.
    ========================================================= */
 @media (max-width: 1023px) {
-  .grid-3 { grid-template-columns: 1fr; }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(2, 1fr); }
 
   .sidebar:not(.mobile-open) {
     width: var(--sidebar-width-collapsed);
@@ -35,50 +35,78 @@
   .sidebar:not(.mobile-open) .nav-label {
     display: none;
   }
-  .sidebar:not(.mobile-open) .nav-item { justify-content: center; padding: 0; }
+  .sidebar:not(.mobile-open) .nav-item { justify-content: center; padding: 0; position: relative; }
+  .sidebar:not(.mobile-open) .nav-badge {
+    position: absolute;
+    top: 2px;
+    right: 6px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 16px;
+    box-shadow: 0 0 0 2px var(--color-surface);
+  }
   .sidebar-collapse-btn { display: none; }
+
+  .header-search { width: 200px; }
 }
 
 /* =========================
-   MD and below (< 768px)
-   Sidebar becomes an off-canvas drawer opened by the hamburger
-   button; the header search bar and stat/card grids collapse to
-   a single column.
+   MD and below (< 768px) — mobile
+   Sidebar becomes an off-canvas drawer (hamburger in the header,
+   backdrop, close button, Esc); grids collapse to one column.
    ========================================================= */
 @media (max-width: 767px) {
   .sidebar {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 150;
-  width: 272px !important;
-  transform: translateX(-100%);
-  transition: transform .2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: var(--shadow-lg);
-}
-  .sidebar.mobile-open { transform: translateX(0); }
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: var(--z-sidebar-mobile);
+    width: min(280px, 85vw) !important;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform var(--duration-normal) var(--ease-out), visibility 0s linear var(--duration-normal);
+    box-shadow: var(--shadow-lg);
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform var(--duration-normal) var(--ease-out), visibility 0s;
+  }
   .sidebar .sidebar-brand-name,
   .sidebar .sidebar-workspace,
   .sidebar .sidebar-section-label,
   .sidebar .nav-label {
     display: block;
   }
-  .sidebar .nav-item { justify-content: flex-start; }
+  .sidebar .nav-item { justify-content: flex-start; padding: 0 var(--space-3); height: 44px; }
+  .sidebar .sidebar-brand { justify-content: flex-start; padding: 0 var(--space-2) 0 var(--space-4); }
   .sidebar-collapse-btn { display: none; }
+  .sidebar .sidebar-close-btn { display: inline-flex; }
 
   .sidebar-overlay.show {
     display: block;
     position: fixed;
     inset: 0;
     background: var(--color-overlay);
-    z-index: 140;
+    z-index: var(--z-overlay);
   }
 
-  .mobile-menu-btn { display: inline-flex; }
+  .header .mobile-menu-btn { display: inline-flex; }
+  /* segmented tabs scroll sideways instead of overflowing the page */
+  .pill-tabs { display: flex; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .pill-tab { flex-shrink: 0; white-space: nowrap; }
+  .header { padding: 0 var(--space-3); gap: var(--space-2); }
+  .header-actions { gap: var(--space-1); }
+  .header-context-parent, .header-context-sep { display: none; }
 
-  .grid-stats, .grid-cards, .grid-2 { grid-template-columns: 1fr; }
+  .header-search { display: none; }
 
+  .grid-4, .grid-3, .grid-2, .grid-stats, .grid-cards { grid-template-columns: 1fr; }
+
+  .page-content { padding: var(--space-4); }
   .page-content-inner { padding: var(--space-4); }
   .project-header { padding: var(--space-4) var(--space-4) 0; }
 
@@ -86,29 +114,30 @@
   .settings-nav { width: 100%; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--color-border); }
   .settings-content { padding: var(--space-4); }
 
-  .task-list-row, .task-list-header-row {
-    grid-template-columns: 1fr auto;
-  }
+  .task-list-row, .task-list-row-header { grid-template-columns: 1fr 90px; }
+  .task-list-header-row { grid-template-columns: 1fr auto; }
   .task-list-column-cell, .task-list-assignee-cell, .task-list-extra-labels,
-  .task-list-header-row span:nth-child(2), .task-list-header-row span:nth-child(3), .task-list-header-row span:nth-child(4) {
+  .task-list-header-row span:nth-child(2), .task-list-header-row span:nth-child(3), .task-list-header-row span:nth-child(4),
+  .task-list-row-header span:nth-child(3), .task-list-row-header span:nth-child(4),
+  .task-list-row .task-list-assignees, .task-list-row .task-list-due {
     display: none;
   }
 
   .member-row, .member-table-header { grid-template-columns: 1fr 40px; }
   .member-row .member-role-cell, .member-row .member-tasks-cell,
+  .member-row .member-role, .member-row .member-tasks,
   .member-table-header span:nth-child(2), .member-table-header span:nth-child(3) {
     display: none;
   }
 
   .admin-user-joined { display: none; }
 
-  .drawer-panel { max-width: 100%; }
+  .drawer-panel { width: 100%; max-width: 100%; }
   .drawer-field-grid { grid-template-columns: 1fr; }
 
   .board-column { width: 260px; }
 
   .header-search .search-label { display: none; }
-  .header-search { max-width: none; width: auto; padding: 0 10px; }
 }
 
 /* =========================
@@ -119,6 +148,3 @@
   .header-search kbd { display: none; }
   .create-btn-label { display: none; }
 }
-
-.mobile-menu-btn { display: none; }
-.sidebar-overlay { display: none; }

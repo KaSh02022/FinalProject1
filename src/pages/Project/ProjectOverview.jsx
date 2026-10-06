@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import Header from './../../components/layout/Header/Header.jsx';
-import Sidebar from './../../components/layout/Sidebar/SideBar.jsx';
+import ErrorState from '../../components/common/ErrorState.jsx';
+import { withFallback, failureMessage } from '../../utils/requestState.js';
 import {
     fetchProjectById,
     fetchTasksByProject,
@@ -52,6 +52,9 @@ export default function ProjectOverview() {
     const [projectMembers, setProjectMembers] = useState([]);
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
+    // Requests that failed in the last load; bump reloadKey to retry
+    const [loadFailures, setLoadFailures] = useState([]);
+    const [reloadKey, setReloadKey] = useState(0);
     const [memberCurrentRole, setMemberRole] = useState("");
 
     // State for Project Details
@@ -113,10 +116,11 @@ export default function ProjectOverview() {
         if (!projectId) return;
 
         setLoading(true);
+        const failures = [];
         Promise.all([
-            fetchProjectById(projectId).catch(() => null),
-            fetchTasksByProject(projectId).catch(() => []),
-            fetchMembersByProject(projectId).catch(() => [])
+            withFallback(fetchProjectById(projectId), null, failures, 'project'),
+            withFallback(fetchTasksByProject(projectId), [], failures, 'tasks'),
+            withFallback(fetchMembersByProject(projectId), [], failures, 'members')
         ]).then(([projectData, tasksData, membersData]) => {
             const realProject = projectData?.data || projectData || {};
             setProject(realProject);
@@ -124,8 +128,11 @@ export default function ProjectOverview() {
             setDocuments(realProject.documents || []);
             setTasks(Array.isArray(tasksData) ? tasksData : (tasksData?.data || []));
             setProjectMembers(Array.isArray(membersData) ? membersData : (membersData?.data || []));
-        }).finally(() => setLoading(false));
-    }, [projectId]);
+        }).finally(() => {
+            setLoadFailures(failures);
+            setLoading(false);
+        });
+    }, [projectId, reloadKey]);
 
     // Save project overview description
     const handleSaveDetail = async () => {
@@ -202,10 +209,25 @@ export default function ProjectOverview() {
 
     if (loading) {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: '12px', color: '#6b7280' }}>
-                <Loader2 className="animate-spin" size={40} style={{ color: '#4f46e5' }} />
+            <div className="page-loading" role="status">
+                <Loader2 className="icon animate-spin" aria-hidden="true" />
                 <span>Loading project details...</span>
             </div>
+        );
+    }
+
+    // The overview is meaningless without the project — show the error, not placeholder values
+    const coreFailure = loadFailures.find((f) => f.label === 'project');
+    const partialFailure = !coreFailure && loadFailures.length > 0;
+    if (coreFailure) {
+        return (
+            <main className="page-content">
+                <ErrorState
+                    title="Couldn't load this project"
+                    message={failureMessage(coreFailure)}
+                    onRetry={() => setReloadKey((k) => k + 1)}
+                />
+            </main>
         );
     }
 
@@ -214,11 +236,7 @@ export default function ProjectOverview() {
     const formattedDueDate = formatDate(project?.date || project?.dueDate || project?.endDate);
 
     return (
-        <div className="app-shell">
-            <Sidebar />
-
-            <div className="app-main">
-                <Header />
+        <>
 
                 {/* Project Header */}
                 <div className="project-header">
@@ -264,6 +282,14 @@ export default function ProjectOverview() {
 
                 {/* Main Content */}
                 <main className="page-content" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    {partialFailure && (
+                        <ErrorState
+                            variant="inline"
+                            title="Some project data could not be loaded."
+                            message="Task or member counts may be incomplete."
+                            onRetry={() => setReloadKey((k) => k + 1)}
+                        />
+                    )}
 
                     {/* Section 1: Project Details Description */}
                     <div className="card" style={{ padding: '20px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
@@ -388,7 +414,6 @@ export default function ProjectOverview() {
                     </div>
 
                 </main>
-            </div>
-        </div>
+        </>
     );
 }

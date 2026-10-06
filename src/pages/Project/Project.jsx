@@ -9,8 +9,6 @@ import {
     CalendarClock,
     Loader2
 } from 'lucide-react';
-import SideBar from './../../components/layout/SideBar/SideBar';
-import Header from './../../components/layout/Header/Header';
 import {
     fetchProjects,
     createProject,
@@ -20,6 +18,8 @@ import {
     fetchMembersByProject
 } from './../../../api.jsx';
 import { Link } from "react-router-dom";
+import ErrorState from '../../components/common/ErrorState.jsx';
+import { failureMessage } from '../../utils/requestState.js';
 
 const COLOR_OPTIONS = [
     '#4f46e5',
@@ -87,7 +87,6 @@ const getProjectStatus = (dueDateStr) => {
 export default function Projects() {
     const todayStr = getTodayString();
 
-    const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
     const [activeModal, setActiveModal] = useState(null);
 
     const [projects, setProjects] = useState([]);
@@ -97,6 +96,8 @@ export default function Projects() {
     const [projectMembersMap, setProjectMembersMap] = useState({});
 
     const [loadingProjects, setLoadingProjects] = useState(true);
+    // Set when the project list request fails: show an error, not "No projects found"
+    const [projectsError, setProjectsError] = useState(null);
     const [loadingMembers, setLoadingMembers] = useState(false);
     const [isSubmittingProject, setIsSubmittingProject] = useState(false);
     const [isSubmittingTask, setIsSubmittingTask] = useState(false);
@@ -158,6 +159,7 @@ export default function Projects() {
 
     const loadProjects = async () => {
         setLoadingProjects(true);
+        setProjectsError(null);
         try {
             const data = await fetchProjects();
             const list = Array.isArray(data) ? data : (data?.data || []);
@@ -215,6 +217,7 @@ export default function Projects() {
 
         } catch (error) {
             console.error("Lỗi fetch projects:", error);
+            setProjectsError(error);
             showToast('Lỗi', 'Không thể tải danh sách Projects.', 'error');
         } finally {
             setLoadingProjects(false);
@@ -366,18 +369,7 @@ export default function Projects() {
     };
 
     return (
-        <div className="app-shell">
-            <SideBar />
-
-            {sidebarMobileOpen && (
-                <div
-                    className="sidebar-overlay show"
-                    onClick={() => setSidebarMobileOpen(false)}
-                />
-            )}
-
-            <div className="app-main">
-                <Header />
+        <>
 
                 <main className="page-content">
                     <div className="page-content-inner">
@@ -409,6 +401,12 @@ export default function Projects() {
                                 <Loader2 className="animate-spin" size={36} style={{ color: '#4f46e5' }} />
                                 <span style={{ fontSize: '15px', fontWeight: 500 }}>Loading...</span>
                             </div>
+                        ) : projectsError ? (
+                            <ErrorState
+                                title="Couldn't load projects"
+                                message={failureMessage({ error: projectsError })}
+                                onRetry={loadProjects}
+                            />
                         ) : projects.length === 0 ? (
                             <div className="empty-state" style={{ padding: '48px 0', textAlign: 'center' }}>
                                 <p className="empty-state-title" style={{ fontSize: '16px', color: '#6b7280' }}>
@@ -554,7 +552,6 @@ export default function Projects() {
                         )}
                     </div>
                 </main>
-            </div>
 
             {/* Modal Create Task */}
             {activeModal === 'quickCreateTaskModal' && (
@@ -801,6 +798,6 @@ export default function Projects() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

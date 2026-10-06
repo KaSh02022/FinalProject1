@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import DropdownHeader from "./DropdownHeader/DropdownHeader";
 import { Menu, Bell } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 // Helper calculate due date based on project start date and week
 const calculateDueDateByWeek = (startDateStr, weekNum = 1) => {
@@ -14,7 +14,21 @@ const calculateDueDateByWeek = (startDateStr, weekNum = 1) => {
     return dueDate;
 };
 
-function Header({ onOpenSidebar, onOpenModal }) {
+// Page context shown on the left of the header, derived from the route only (no extra API call)
+const ROUTE_CONTEXT = [
+    { prefix: "/dashboard", title: "Dashboard" },
+    { prefix: "/myTasks", title: "My Tasks" },
+    { prefix: "/adminuser", title: "Users", parent: "Admin" },
+    { prefix: "/projectoverview", title: "Overview", parent: "Projects" },
+    { prefix: "/projectchart", title: "Chart", parent: "Projects" },
+    { prefix: "/projectboard", title: "Board", parent: "Projects" },
+    { prefix: "/projectlist", title: "Backlog", parent: "Projects" },
+    { prefix: "/projectcalendar", title: "Calendar", parent: "Projects" },
+    { prefix: "/projectsetting", title: "Settings", parent: "Projects" },
+    { prefix: "/project", title: "Projects" },
+];
+
+function Header({ onOpenSidebar, menuButtonRef, sidebarOpen = false }) {
     const [expiringTasks, setExpiringTasks] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -116,137 +130,97 @@ function Header({ onOpenSidebar, onOpenModal }) {
         };
     }, []);
 
+    // Esc closes the notification panel
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKeyDown = (e) => {
+            if (e.key === "Escape") setIsOpen(false);
+        };
+        document.addEventListener("keydown", onKeyDown);
+        return () => document.removeEventListener("keydown", onKeyDown);
+    }, [isOpen]);
+
+    const { pathname } = useLocation();
+    const context = ROUTE_CONTEXT.find((c) => pathname.startsWith(c.prefix));
+
     const count = expiringTasks.length;
 
     return (
-        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <header className="header">
             <button
+                ref={menuButtonRef}
+                type="button"
                 className="icon-btn mobile-menu-btn"
                 onClick={onOpenSidebar}
                 aria-label="Open menu"
+                aria-controls="app-sidebar"
+                aria-expanded={sidebarOpen}
             >
                 <Menu className="icon" />
             </button>
 
-            {/* Right actions: Bell + Profile */}
-            <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
-                <div ref={dropdownRef} style={{ position: 'relative' }}>
-                    <button
-                        className="icon-btn"
-                        onClick={() => setIsOpen(!isOpen)}
-                        aria-label="Notifications"
-                        style={{
-                            position: 'relative',
-                            width: '38px',
-                            height: '38px',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            border: 'none',
-                            background: '#f3f4f6'
-                        }}
-                    >
-                        <Bell className="icon" size={20} color="#374151" />
+            {context && (
+                <div className="header-context">
+                    {context.parent === "Projects" ? (
+                        <Link to="/project" className="header-context-link header-context-parent">Projects</Link>
+                    ) : context.parent ? (
+                        <span className="header-context-parent">{context.parent}</span>
+                    ) : null}
+                    {context.parent && <span className="header-context-sep" aria-hidden="true">/</span>}
+                    <span className="header-context-current" aria-current="page">{context.title}</span>
+                </div>
+            )}
 
+            {/* Right actions: Bell + Profile */}
+            <div className="header-actions">
+                <div ref={dropdownRef} className="header-popover-anchor">
+                    <button
+                        type="button"
+                        className="icon-btn notif-btn"
+                        onClick={() => setIsOpen(!isOpen)}
+                        aria-label={count > 0 ? `Notifications, ${count} expiring soon` : "Notifications"}
+                        aria-haspopup="true"
+                        aria-expanded={isOpen}
+                    >
+                        <Bell className="icon" />
                         {count > 0 && (
-                            <span style={{
-                                position: 'absolute',
-                                top: '-2px',
-                                right: '-2px',
-                                backgroundColor: '#ef4444',
-                                color: '#ffffff',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                borderRadius: '9999px',
-                                minWidth: '18px',
-                                height: '18px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '0 4px',
-                                border: '2px solid #ffffff',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                            }}>
-                                {count > 99 ? '99+' : count}
-                            </span>
+                            <span className="notif-count" aria-hidden="true">{count > 99 ? '99+' : count}</span>
                         )}
                     </button>
 
                     {isOpen && (
-                        <div style={{
-                            position: 'absolute',
-                            top: '46px',
-                            right: '0',
-                            width: '320px',
-                            backgroundColor: '#ffffff',
-                            borderRadius: '12px',
-                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                            border: '1px solid #e5e7eb',
-                            zIndex: 1000,
-                            overflow: 'hidden'
-                        }}>
-                            <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <strong style={{ fontSize: '14px', color: '#111827' }}>Notifications</strong>
-                                <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>{count} expiring soon</span>
+                        <div className="notif-panel" role="region" aria-label="Notifications">
+                            <div className="notif-panel-header">
+                                <strong className="notif-panel-title">Notifications</strong>
+                                <span className="notif-panel-meta">{count} expiring soon</span>
                             </div>
 
-                            <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                            <div className="notif-list">
                                 {expiringTasks.length === 0 ? (
-                                    <div style={{ padding: '24px 16px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
-                                        No expiring tasks
-                                    </div>
+                                    <div className="notif-empty">No expiring tasks</div>
                                 ) : (
                                     expiringTasks.map((task) => (
                                         <Link
                                             key={task._id}
                                             to="/myTasks"
                                             onClick={() => setIsOpen(false)}
-                                            style={{
-                                                display: 'block',
-                                                padding: '10px 16px',
-                                                borderBottom: '1px solid #f9fafb',
-                                                textDecoration: 'none',
-                                                color: 'inherit',
-                                                transition: 'background 0.15s'
-                                            }}
-                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                            className="notif-item"
                                         >
-                                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#1f2937', marginBottom: '2px' }}>
-                                                {task.title || task.name}
-                                            </div>
-                                            <div style={{ fontSize: '11px', color: '#d97706', fontWeight: 500 }}>
-                                                 Expiring soon
-                                            </div>
+                                            <div className="notif-item-title">{task.title || task.name}</div>
+                                            <div className="notif-item-meta">Expiring soon</div>
                                         </Link>
                                     ))
                                 )}
                             </div>
 
-                            <Link
-                                to="/myTasks"
-                                onClick={() => setIsOpen(false)}
-                                style={{
-                                    display: 'block',
-                                    textAlign: 'center',
-                                    padding: '10px',
-                                    backgroundColor: '#f9fafb',
-                                    color: '#2563eb',
-                                    fontSize: '13px',
-                                    fontWeight: 500,
-                                    textDecoration: 'none',
-                                    borderTop: '1px solid #f3f4f6'
-                                }}
-                            >
+                            <Link to="/myTasks" onClick={() => setIsOpen(false)} className="notif-footer">
                                 View all in My Tasks
                             </Link>
                         </div>
                     )}
                 </div>
 
-                <DropdownHeader onOpenModal={onOpenModal} />
+                <DropdownHeader />
             </div>
         </header>
     );

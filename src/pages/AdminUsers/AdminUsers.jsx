@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { updateUserStatus } from "../../../api";
+import ErrorState from "../../components/common/ErrorState.jsx";
+import { failureMessage } from "../../utils/requestState.js";
 
 function AdminUsers() {
     const [users, setUsers] = useState([]);
     const [showToats, setShowToast] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedRole, setSelectedRole] = useState("All");
+    // User list request failed: show the error, not an empty list. Bump reloadKey to retry.
+    const [loadError, setLoadError] = useState(null);
+    const [reloadKey, setReloadKey] = useState(0);
     const navigate = useNavigate();
 
     // Lấy ID người dùng hiện tại từ localStorage
@@ -25,10 +30,21 @@ function AdminUsers() {
 
     useEffect(() => {
         fetch("http://localhost:3000/api/user")
-            .then((res) => res.json())
+            .then((res) => {
+                if (!res.ok) throw new Error(`Lỗi ${res.status}: Không thể tải danh sách người dùng`);
+                return res.json();
+            })
             .then((data) => setUsers(data))
-            .catch((err) => console.error(" Fetch error:", err));
-    }, []);
+            .catch((err) => {
+                console.error(" Fetch error:", err);
+                setLoadError(err);
+            });
+    }, [reloadKey]);
+
+    const retryLoad = () => {
+        setLoadError(null);
+        setReloadKey((k) => k + 1);
+    };
 
     const handleToggleStatus = async (userId, currentStatus) => {
         const newStatus = currentStatus === "Active" ? "Inactive" : "Active";
@@ -91,7 +107,14 @@ function AdminUsers() {
                         </select>
                     </div>
 
-                    <div className="card">
+                    {loadError && (
+                        <ErrorState
+                            title="Couldn't load users"
+                            message={failureMessage({ error: loadError })}
+                            onRetry={retryLoad}
+                        />
+                    )}
+                    <div className={loadError ? "hidden" : "card"}>
                         {filteredUsers.map((user) => (
                             <div key={user._id} className="admin-user-row" data-filter-target="adminUsers">
                                 <div className="admin-user-identity">

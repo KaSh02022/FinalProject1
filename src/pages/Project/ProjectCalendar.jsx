@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import Header from './../../components/layout/Header/Header.jsx';
-import Sidebar from './../../components/layout/Sidebar/Sidebar.jsx';
+import ErrorState from '../../components/common/ErrorState.jsx';
+import { withFallback, failureMessage } from '../../utils/requestState.js';
 
 import {
     LayoutGrid,
@@ -90,8 +90,6 @@ const extractUserId = (member) => {
 export default function ProjectCalendar() {
     const { id: projectId } = useParams();
 
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
     const [activeModal, setActiveModal] = useState(null);
 
     const [project, setProject] = useState({});
@@ -100,6 +98,8 @@ export default function ProjectCalendar() {
     const [tasks, setTasks] = useState([]);
     const [notes, setNotes] = useState([]);
     const [loading, setLoading] = useState(true);
+    // Requests that failed in the last load (empty = everything loaded)
+    const [loadFailures, setLoadFailures] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Month/Year display state for Calendar
@@ -170,13 +170,14 @@ export default function ProjectCalendar() {
 
     const loadData = async () => {
         if (!projectId) return;
+        const failures = [];
         try {
             setLoading(true);
             const [pData, tskList, membersData, notesData] = await Promise.all([
-                fetchProjectById(projectId).catch(() => ({})),
-                fetchTasksByProject(projectId).catch(() => []),
-                fetchMembersByProject(projectId).catch(() => []),
-                fetchNotesByProject ? fetchNotesByProject(projectId).catch(() => []) : Promise.resolve([])
+                withFallback(fetchProjectById(projectId), {}, failures, 'project'),
+                withFallback(fetchTasksByProject(projectId), [], failures, 'tasks'),
+                withFallback(fetchMembersByProject(projectId), [], failures, 'members'),
+                fetchNotesByProject ? withFallback(fetchNotesByProject(projectId), [], failures, 'notes') : Promise.resolve([])
             ]);
 
             const realProject = pData?.data || pData || {};
@@ -192,7 +193,9 @@ export default function ProjectCalendar() {
             setNotes(realNotes);
         } catch (err) {
             console.error('Error loading calendar data:', err);
+            failures.push({ label: 'calendar', error: err });
         } finally {
+            setLoadFailures(failures);
             setLoading(false);
         }
     };
@@ -422,26 +425,27 @@ export default function ProjectCalendar() {
     const formattedStartDate = formatDateDMY(project?.startDate || project?.start_date || project?.createdAt);
     const formattedDueDate = formatDateDMY(project?.date || project?.dueDate || project?.endDate);
 
-    return (
-        <div className="app-shell">
-            <Sidebar
-                collapsed={sidebarCollapsed}
-                setCollapsed={setSidebarCollapsed}
-                mobileOpen={sidebarMobileOpen}
-                setMobileOpen={setSidebarMobileOpen}
-            />
+    // Core data missing → show the error instead of placeholder values; other failures → inline notice
+    const CORE_LOADS = ['project', 'tasks', 'calendar'];
+    const coreFailure = loadFailures.find((f) => CORE_LOADS.includes(f.label));
+    const partialFailure = !coreFailure && loadFailures.length > 0;
 
-            <div className="app-main">
-                <Header
-                    onOpenSidebar={() => setSidebarMobileOpen(true)}
-                    onOpenModal={(modal) => setActiveModal(modal)}
-                />
+    return (
+        <>
 
                 {loading ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: '60vh', color: '#64748b', gap: '12px' }}>
-                        <Loader2 className="animate-spin" style={{ width: 36, height: 36, color: '#4f46e5' }} />
-                        <span style={{ fontSize: '15px', fontWeight: 500 }}>Loading...</span>
+                    <div className="page-loading" role="status">
+                        <Loader2 className="icon animate-spin" aria-hidden="true" />
+                        <span>Loading...</span>
                     </div>
+                ) : coreFailure ? (
+                    <main className="page-content">
+                        <ErrorState
+                            title="Couldn't load the project calendar"
+                            message={failureMessage(coreFailure)}
+                            onRetry={loadData}
+                        />
+                    </main>
                 ) : (
                     <>
                         {/* Project Header */}
@@ -489,6 +493,14 @@ export default function ProjectCalendar() {
 
                         {/* Main Content: Calendar */}
                         <main className="page-content" style={{ padding: '20px' }}>
+                            {partialFailure && (
+                                <ErrorState
+                                    variant="inline"
+                                    title="Some project data could not be loaded."
+                                    message="Members or notes may be missing."
+                                    onRetry={loadData}
+                                />
+                            )}
                             {/* Navigation Toolbar */}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                                 <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a' }}>
@@ -725,7 +737,6 @@ export default function ProjectCalendar() {
                         )}
                     </>
                 )}
-            </div>
-        </div>
+        </>
     );
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import Header from './../../components/layout/Header/Header.jsx';
-import Sidebar from './../../components/layout/Sidebar/Sidebar.jsx';
+import ErrorState from '../../components/common/ErrorState.jsx';
+import { withFallback, failureMessage } from '../../utils/requestState.js';
 
 import {
     LayoutGrid,
@@ -99,9 +99,6 @@ export default function ProjectSetting() {
     const { id: projectId } = useParams();
     const navigate = useNavigate();
 
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
-    const [activeModal, setActiveModal] = useState(null);
 
     const [activeTab, setActiveTab] = useState('general');
 
@@ -129,6 +126,8 @@ export default function ProjectSetting() {
     const [tasks, setTasks] = useState([]);
     const [columns, setColumns] = useState([]);
     const [loading, setLoading] = useState(true);
+    // Requests that failed in the last load (empty = everything loaded)
+    const [loadFailures, setLoadFailures] = useState([]);
     const [saving, setSaving] = useState(false);
 
     const todayString = getTodayString();
@@ -214,14 +213,15 @@ export default function ProjectSetting() {
     }, [projectId]);
 
     const loadData = async () => {
+        const failures = [];
         try {
             setLoading(true);
 
             const [projectData, memList, tskList, colList] = await Promise.all([
-                fetchProjectById(projectId).catch(() => null),
-                fetchMembersByProject(projectId).catch(() => []),
-                fetchTasksByProject(projectId).catch(() => []),
-                fetchColumnsByProject ? fetchColumnsByProject(projectId).catch(() => []) : []
+                withFallback(fetchProjectById(projectId), null, failures, 'project'),
+                withFallback(fetchMembersByProject(projectId), [], failures, 'members'),
+                withFallback(fetchTasksByProject(projectId), [], failures, 'tasks'),
+                fetchColumnsByProject ? withFallback(fetchColumnsByProject(projectId), [], failures, 'columns') : []
             ]);
 
             const realProject = projectData?.data || projectData || {};
@@ -252,7 +252,9 @@ export default function ProjectSetting() {
             await fetchCurrentMemberRole();
         } catch (err) {
             console.error('Lỗi khi tải cài đặt dự án:', err);
+            failures.push({ label: 'settings', error: err });
         } finally {
+            setLoadFailures(failures);
             setLoading(false);
         }
     };
@@ -449,26 +451,27 @@ export default function ProjectSetting() {
         ? { cursor: 'not-allowed', backgroundColor: 'var(--color-bg-muted, #f1f5f9)', opacity: 0.8 }
         : {};
 
-    return (
-        <div className="app-shell">
-            <Sidebar
-                collapsed={sidebarCollapsed}
-                setCollapsed={setSidebarCollapsed}
-                mobileOpen={sidebarMobileOpen}
-                setMobileOpen={setSidebarMobileOpen}
-            />
+    // Core data missing → show the error instead of placeholder values; other failures → inline notice
+    const CORE_LOADS = ['project', 'members', 'settings'];
+    const coreFailure = loadFailures.find((f) => CORE_LOADS.includes(f.label));
+    const partialFailure = !coreFailure && loadFailures.length > 0;
 
-            <div className="app-main">
-                <Header
-                    onOpenSidebar={() => setSidebarMobileOpen(true)}
-                    onOpenModal={(modal) => setActiveModal(modal)}
-                />
+    return (
+        <>
 
                 {loading ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: '60vh', color: '#64748b', gap: '12px' }}>
-                        <Loader2 className="animate-spin" style={{ width: 36, height: 36, color: '#4f46e5' }} />
-                        <span style={{ fontSize: '15px', fontWeight: 500 }}>Loading...</span>
+                    <div className="page-loading" role="status">
+                        <Loader2 className="icon animate-spin" aria-hidden="true" />
+                        <span>Loading...</span>
                     </div>
+                ) : coreFailure ? (
+                    <main className="page-content">
+                        <ErrorState
+                            title="Couldn't load project settings"
+                            message={failureMessage(coreFailure)}
+                            onRetry={loadData}
+                        />
+                    </main>
                 ) : (
                     <>
                         <div className="project-header">
@@ -525,6 +528,22 @@ export default function ProjectSetting() {
                         </div>
 
                         <main className="page-content" style={{ padding: 'var(--space-6)' }}>
+
+                            {partialFailure && (
+
+                                <ErrorState
+
+                                    variant="inline"
+
+                                    title="Some project data could not be loaded."
+
+                                    message="Task and column statistics may be incomplete."
+
+                                    onRetry={loadData}
+
+                                />
+
+                            )}
                             <div className="settings-layout">
                                 <nav className="settings-nav">
                                     <button
@@ -877,7 +896,6 @@ export default function ProjectSetting() {
                         </main>
                     </>
                 )}
-            </div>
 
             {/* Modal Invite Member */}
             {openInviteModal && (
@@ -924,6 +942,6 @@ export default function ProjectSetting() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

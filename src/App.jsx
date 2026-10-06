@@ -53,22 +53,23 @@ function App() {
         <>
             <Routes>
                 <Route index element={<Login/>}/>
+                {/* Signed-in pages share one shell (sidebar + header). Paths are unchanged. */}
                 <Route element={<MainLayout/>}>
                     <Route path='/dashboard' element ={<Dashboard/>}/>
                     <Route path='/myTasks' element ={<MyTasks/>}/>
                     <Route path='/adminuser' element ={<AdminUsers/>}/>
+                    <Route path = "/project" element={<Project/>}/>
+                    <Route path="/projectboard/:id" element={<ProjectBoard />} />
+                    <Route path = "/projectlist/:id" element = {<ProjectList/>}/>
+                    <Route path = "/projectcalendar/:id" element = {<ProjectCalendar/>}/>
+                    <Route path = "/projectsetting/:id" element = {<ProjectSetting/>}/>
+                    <Route path = "/projectoverview/:id" element = {<ProjectOverview/>}/>
+                    <Route path = "/projectchart/:id" element = {<ProjectChart/>}/>
                 </Route>
-                <Route path = "/project" element={<Project/>}/>
                 <Route path = "/login" element={<Login/>}/>
                 <Route path = "/register" element={<Register/>}/>
                 <Route path = "/forgot" element={<ForgetPassword/>}/>
                 <Route path = "/resetPassword" element={<ResetPassword/>}/>
-                <Route path="/projectboard/:id" element={<ProjectBoard />} />
-                <Route path = "/projectlist/:id" element = {<ProjectList/>}/>
-                <Route path = "/projectcalendar/:id" element = {<ProjectCalendar/>}/>
-                <Route path = "/projectsetting/:id" element = {<ProjectSetting/>}/>
-                <Route path = "/projectoverview/:id" element = {<ProjectOverview/>}/>
-                <Route path = "/projectchart/:id" element = {<ProjectChart/>}/>
             </Routes>
         </>
     )

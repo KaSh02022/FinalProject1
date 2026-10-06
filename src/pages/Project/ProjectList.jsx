@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import Header from './../../components/layout/Header/Header.jsx';
-import Sidebar from './../../components/layout/Sidebar/Sidebar.jsx';
+import ErrorState from '../../components/common/ErrorState.jsx';
+import { withFallback, failureMessage } from '../../utils/requestState.js';
 
 import {
     LayoutGrid,
@@ -44,8 +44,6 @@ const formatDate = (dateString, fallback = 'Chưa đặt') => {
 export default function ProjectList() {
     const { id: projectId } = useParams();
 
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
     const [activeModal, setActiveModal] = useState(null);
 
     const [project, setProject] = useState({});
@@ -54,6 +52,8 @@ export default function ProjectList() {
     const [columns, setColumns] = useState([]);
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
+    // Requests that failed in the last load (empty = everything loaded)
+    const [loadFailures, setLoadFailures] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -131,14 +131,15 @@ export default function ProjectList() {
 
     const loadData = async () => {
         if (!projectId) return;
+        const failures = [];
 
         try {
             setLoading(true);
             const [pData, colsData, tskList, membersData] = await Promise.all([
-                fetchProjectById(projectId).catch(() => ({})),
-                fetchColumnsByProject(projectId).catch(() => []),
-                fetchTasksByProject(projectId).catch(() => []),
-                fetchMembersByProject(projectId).catch(() => [])
+                withFallback(fetchProjectById(projectId), {}, failures, 'project'),
+                withFallback(fetchColumnsByProject(projectId), [], failures, 'columns'),
+                withFallback(fetchTasksByProject(projectId), [], failures, 'tasks'),
+                withFallback(fetchMembersByProject(projectId), [], failures, 'members')
             ]);
 
             const realProject = pData?.data || pData || {};
@@ -190,7 +191,9 @@ export default function ProjectList() {
             setProjectMembers(realMembers);
         } catch (err) {
             console.error('Error loading backlog tasks:', err);
+            failures.push({ label: 'backlog', error: err });
         } finally {
+            setLoadFailures(failures);
             setLoading(false);
         }
     };
@@ -309,26 +312,26 @@ export default function ProjectList() {
     const formattedStartDate = formatDate(project?.startDate || project?.start_date || project?.createdAt);
     const formattedDueDate = formatDate(project?.date || project?.dueDate || project?.endDate);
 
-    return (
-        <div className="app-shell">
-            <Sidebar
-                collapsed={sidebarCollapsed}
-                setCollapsed={setSidebarCollapsed}
-                mobileOpen={sidebarMobileOpen}
-                setMobileOpen={setSidebarMobileOpen}
-            />
+    // Without the project, its columns and tasks the backlog would be wrong — show the error instead
+    const coreFailure = loadFailures.find((f) => f.label !== 'members');
+    const membersFailed = loadFailures.some((f) => f.label === 'members');
 
-            <div className="app-main">
-                <Header
-                    onOpenSidebar={() => setSidebarMobileOpen(true)}
-                    onOpenModal={(modal) => setActiveModal(modal)}
-                />
+    return (
+        <>
 
                 {loading ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: '60vh', color: '#64748b', gap: '12px' }}>
-                        <Loader2 className="animate-spin" style={{ width: 36, height: 36, color: '#4f46e5' }} />
-                        <span style={{ fontSize: '15px', fontWeight: 500 }}>Loading...</span>
+                    <div className="page-loading" role="status">
+                        <Loader2 className="icon animate-spin" aria-hidden="true" />
+                        <span>Loading...</span>
                     </div>
+                ) : coreFailure ? (
+                    <main className="page-content">
+                        <ErrorState
+                            title="Couldn't load the backlog"
+                            message={failureMessage(coreFailure)}
+                            onRetry={loadData}
+                        />
+                    </main>
                 ) : (
                     <>
                         <div className="project-header">
@@ -374,6 +377,14 @@ export default function ProjectList() {
                         </div>
 
                         <main className="page-content" style={{ padding: '20px' }}>
+                            {membersFailed && (
+                                <ErrorState
+                                    variant="inline"
+                                    title="Project members could not be loaded."
+                                    message="Assignee names may be missing."
+                                    onRetry={loadData}
+                                />
+                            )}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                                 <div>
                                     <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a' }}>Pending Backlog Tasks</h2>
@@ -495,7 +506,6 @@ export default function ProjectList() {
                         </main>
                     </>
                 )}
-            </div>
 
             {/* CREATE TASK MODAL */}
             {isManager && activeModal === 'quickCreateTaskModal' && (
@@ -579,6 +589,6 @@ export default function ProjectList() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

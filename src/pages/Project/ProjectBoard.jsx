@@ -3,8 +3,6 @@ import { useParams, Link } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 // Import socket instance từ file socket.js của bạn
 import {socket} from './../../utils/socket.js';
-import Header from './../../components/layout/Header/Header.jsx';
-import Sidebar from './../../components/layout/Sidebar/SideBar.jsx';
 import {
     fetchProjectById,
     fetchTasksByProject,
@@ -23,6 +21,8 @@ import {
     moveTask,
 } from './../../../api.jsx';
 import "./project.css";
+import ErrorState from '../../components/common/ErrorState.jsx';
+import { withFallback, failureMessage } from '../../utils/requestState.js';
 import {
     Calendar,
     CalendarClock,
@@ -778,6 +778,8 @@ export default function ProjectBoard({ projectId: propProjectId }) {
     const [columns, setColumns] = useState([]);
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
+    // Requests that failed in the last load (empty = everything loaded)
+    const [loadFailures, setLoadFailures] = useState([]);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedWeek, setSelectedWeek] = useState('all');
@@ -846,15 +848,16 @@ export default function ProjectBoard({ projectId: propProjectId }) {
 
     const fetchBoardData = async () => {
         if (!activeProjectId) return;
+        const failures = [];
 
         try {
             setLoading(true);
 
             const [projectData, columnsData, tasksData, membersData] = await Promise.all([
-                fetchProjectById(activeProjectId).catch(() => null),
-                fetchColumnsByProject(activeProjectId).catch(() => []),
-                fetchTasksByProject(activeProjectId).catch(() => []),
-                fetchMembersByProject(activeProjectId).catch(() => [])
+                withFallback(fetchProjectById(activeProjectId), null, failures, 'project'),
+                withFallback(fetchColumnsByProject(activeProjectId), [], failures, 'columns'),
+                withFallback(fetchTasksByProject(activeProjectId), [], failures, 'tasks'),
+                withFallback(fetchMembersByProject(activeProjectId), [], failures, 'members')
             ]);
 
             const realProject = projectData?.data || projectData || {};
@@ -872,7 +875,9 @@ export default function ProjectBoard({ projectId: propProjectId }) {
             setProjectMembers(realMembers);
         } catch (error) {
             console.error("Lỗi khi tải dữ liệu từ API:", error);
+            failures.push({ label: 'board', error });
         } finally {
+            setLoadFailures(failures);
             setLoading(false);
         }
     };
@@ -1219,10 +1224,25 @@ export default function ProjectBoard({ projectId: propProjectId }) {
 
     if (loading) {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: '12px', color: '#6b7280' }}>
-                <Loader2 className="animate-spin" size={40} style={{ color: '#4f46e5' }} />
-                <span style={{ fontSize: '15px', fontWeight: 500 }}>Loading...</span>
+            <div className="page-loading" role="status">
+                <Loader2 className="icon animate-spin" aria-hidden="true" />
+                <span>Loading...</span>
             </div>
+        );
+    }
+
+    // Board cannot be shown without the project, its columns and its tasks — show the error, not an empty board
+    const coreFailure = loadFailures.find((f) => f.label !== 'members');
+    const membersFailed = loadFailures.some((f) => f.label === 'members');
+    if (coreFailure) {
+        return (
+            <main className="page-content">
+                <ErrorState
+                    title="Couldn't load this project board"
+                    message={failureMessage(coreFailure)}
+                    onRetry={fetchBoardData}
+                />
+            </main>
         );
     }
 
@@ -1230,11 +1250,7 @@ export default function ProjectBoard({ projectId: propProjectId }) {
     const formattedDueDate = formatDateDMY(project?.date || project?.dueDate || project?.endDate);
 
     return (
-        <div className="app-shell">
-            <Sidebar />
-
-            <div className="app-main">
-                <Header onOpenModal={(modal) => setActiveModal(modal)} />
+        <>
 
                 <div className="project-header">
                     <div className="project-header-top">
@@ -1276,6 +1292,14 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                 </div>
 
                 <main className="page-content">
+                    {membersFailed && (
+                        <ErrorState
+                            variant="inline"
+                            title="Project members could not be loaded."
+                            message="Assignee names may be missing."
+                            onRetry={fetchBoardData}
+                        />
+                    )}
                     <div className="filter-bar" style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
                         <div className="input-icon-wrap" style={{ width: '260px', flexShrink: 0 }}>
                             <span className="input-icon">🔍</span>
@@ -1610,7 +1634,6 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                         </div>
                     </DragDropContext>
                 </main>
-            </div>
 
             <TaskDrawer
                 taskId={selectedTaskId}
@@ -1765,6 +1788,6 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

@@ -7,9 +7,9 @@
 | Mục | Giá trị |
 |---|---|
 | Cập nhật lần cuối | 2026-10-06 |
-| Trạng thái hiện tại | **Phase 0–4 (Khảo sát + Audit + Đề xuất + Roadmap) HOÀN THÀNH — CHỜ DUYỆT** |
-| Code đã sửa | **Chưa sửa dòng code nào** |
-| Phase triển khai kế tiếp | Phase A — Design Foundation & CSS Consolidation (chờ user cho phép) |
+| Trạng thái hiện tại | **Phase A + Phase B COMPLETED** (2026-10-06). Board với dữ liệu thật: **BLOCKED** (không có backend) |
+| Code đã sửa | Có — xem **Changed Files**. Git: baseline `a9ef6f4`, Phase A `4908de3`, Phase B (commit kế tiếp) |
+| Phase triển khai kế tiếp | Phase C — Project Header + Kanban Board & Column (**chờ user cho phép**) |
 
 ---
 
@@ -478,7 +478,7 @@ Một hệ breakpoint duy nhất (giữ theo `responsive.css`): **sm 640 · md 7
 | 4 | Tạo tài liệu master | ✅ COMPLETED (2026-10-06) |
 | 5 | Roadmap | ✅ COMPLETED (2026-10-06) |
 | A | Design Foundation & CSS Consolidation | ✅ COMPLETED (2026-10-06) |
-| B | App Shell / Sidebar / Header | ⬜ Chưa bắt đầu |
+| B | App Shell / Sidebar / Header (+ API error state) | ✅ COMPLETED (2026-10-06) — phần cần dữ liệu thật: BLOCKED |
 | C | Project Header + Board & Column | ⬜ |
 | D | Task Card | ⬜ |
 | E | Task Detail Drawer | ⬜ |
@@ -551,6 +551,62 @@ Chạy 2 lần trên cùng code cho diff = 0 → công cụ ổn định.
 - ~450 inline style và ~340 hex trong JSX **chưa đụng** (Phase A không sửa JSX).
 - Breakpoint kép (1024/768 vs 1023/767) → Phase B.
 
+### Phase B — App Shell / Sidebar / Header — COMPLETED
+
+**Objective**: một App Shell thống nhất, điều hướng dùng được ở mọi viewport, sửa 3 lỗi Critical (sidebar mobile, tràn 390px, lỗi API bị trình bày thành dữ liệu giả/rỗng).
+
+**Implemented**
+
+1. **MainLayout = App Shell duy nhất** (refactor file có sẵn, không tạo AppShell mới):
+   - 7 route Project (`/project`, `/projectboard/:id`, `/projectlist/:id`, `/projectcalendar/:id`, `/projectsetting/:id`, `/projectoverview/:id`, `/projectchart/:id`) được lồng vào `<Route element={<MainLayout/>}>` — **path giữ nguyên**.
+   - Gỡ Sidebar/Header tự dựng khỏi 7 trang bằng script có bộ so khớp thẻ JSX: chỉ thay wrapper `app-shell`/`app-main` bằng Fragment, xoá `<Sidebar/>`, `<Header/>`, import và state sidebar chết. **Không đổi nội dung trang.** Import sai hoa/thường (`Sidebar/Sidebar.jsx`) biến mất cùng lúc (KI-02 đã xử lý).
+   - Modal/drawer của các trang (vốn là anh em trong `app-shell`) giờ nằm trong `app-main` — đều `position: fixed` nên không đổi hiển thị.
+   - State sidebar trong MainLayout: `collapsed` (desktop, lưu `localStorage['tf.sidebarCollapsed']`, đọc/ghi bọc try/catch), `mobileOpen`. Đóng drawer khi: bấm backdrop, nút ✕, **Esc**, **mọi điều hướng kể cả Back/Forward** (so `location.key` trong lúc render — pattern chuẩn của React, không thêm effect), và khi rời layout mobile (xoay/đổi kích thước). Khi mở: `body` + `.page-content` không cuộn; focus vào nút ✕; khi đóng: focus về nút menu.
+2. **Sidebar** (`SideBar.jsx`, `Nav.jsx`, `layouts.css`, `responsive.css`):
+   - Desktop ≥1024: 260px, nút **Collapse** → rail 72px. Tablet 768–1023: rail 72px (tooltip qua `title`). Mobile <768: drawer `min(280px, 85vw)` + backdrop + nút ✕; khi đóng có `inert` + `visibility: hidden` (không Tab vào được); khi mở `role="dialog" aria-modal`.
+   - Active state nhẹ (`primary-50` + chữ `primary-700` đậm) thay cho khối tím đặc. **"Projects" active trên mọi route `/project*`** (trước đây mất active khi vào Board).
+   - Badge "My Tasks" dùng class `.nav-badge` (bỏ inline style; ở dạng rail thành chấm đếm góc icon).
+3. **Header** (`Header.jsx`, `DropdownHeader.jsx`):
+   - Trái: nút menu (chỉ <768, `aria-controls`/`aria-expanded`) + ngữ cảnh trang lấy từ route (**không gọi thêm API**): "Dashboard", "Projects / Board"… (mobile chỉ hiện mục cuối).
+   - Phải: chuông + avatar. Popover thông báo chuyển từ ~40 dòng inline style sang class `.notif-*`; rộng `min(320px, 100vw − 24px)`; Esc/click ngoài để đóng; `aria-expanded`. **Logic fetch task sắp hết hạn giữ nguyên.**
+   - Menu tài khoản: đóng khi click ngoài/Esc; **bỏ dữ liệu giả** khi thiếu user (`no-email@domain.com`, role `member`) — chỉ hiện những gì có trong `localStorage.user`; avatar không còn hex cứng. Logic đăng xuất giữ nguyên.
+   - Prop `onOpenModal` (trước truyền vào Header nhưng DropdownHeader không dùng) đã bỏ — không mất chức năng.
+4. **Hợp nhất breakpoint** (DEC-015): 2 khối media 1024/768 của `project.css` + `.mobile-menu-btn{display:none}` (thủ phạm Critical #1) đã gỡ; giá trị đang hiệu lực được chuyển vào `responsive.css` (1279/1023/767/639).
+5. **API error ≠ empty ≠ dữ liệu giả** (Critical #3) — `src/components/common/ErrorState.jsx` (dùng lại CSS `.error-state`, thêm biến thể inline) + `src/utils/requestState.js` (`withFallback`: **giữ nguyên giá trị fallback cũ** nên logic trang không đổi, nhưng ghi nhận request thất bại; `failureMessage`):
+   | Trang | Lỗi "lõi" → Error State + Retry | Lỗi phụ → cảnh báo inline (trang vẫn dùng được) |
+   |---|---|---|
+   | Board | project, columns, tasks | members |
+   | Backlog (List) | project, columns, tasks (columns lỗi sẽ khiến mọi task bị coi là backlog) | members |
+   | Calendar | project, tasks | members, notes |
+   | Settings | project, members (tránh **form trống có thể lưu đè** dữ liệu thật) | tasks, columns |
+   | Overview | project | tasks, members |
+   | Chart | project, tasks, columns (biểu đồ từ dữ liệu lỗi = số 0 giả) | members |
+   | Projects | danh sách project | — |
+   | Admin Users | danh sách user (thêm kiểm tra `res.ok`; trước đây lỗi JSON → `users.filter` crash) | — |
+   | Dashboard KPI | portfolio (trước hiện 0 / 0% / $0 khi lỗi) | — |
+   Retry: gọi lại đúng hàm tải sẵn có (`fetchBoardData`, `loadData`, `loadProjects`); Overview/Chart/KPI/AdminUsers tải trong `useEffect` nên Retry tăng `reloadKey` (dependency của effect) — **không viết lại logic tải**. Loading toàn màn hình `minHeight: 100vh` đổi thành `.page-loading` bên trong shell.
+6. **Dashboard**: bỏ "Welcome back, Cao" viết cứng → lấy `username/name` từ `localStorage.user`, thiếu thì "Welcome back" (không tạo tên giả). `class=` → `className=` (hết lỗi console `Invalid DOM property`, KI-13 phần MainLayout/Dashboard).
+7. **Tràn ngang mobile**: thanh tab project (Phase A) và pill tabs MyTasks cuộn ngang trong vùng của chúng; padding mobile của `.project-header` giờ có hiệu lực (trước bị project.css chặn).
+8. **Lỗi phát hiện & sửa trong lúc QA Phase B**: (a) nút hamburger + nút ✕ **hiện trên desktop** vì `.icon-btn{display:inline-flex}` (style.css, nạp sau layouts.css) đè `display:none` — trước đây bị che bởi project.css → tăng độ đặc hiệu `.header .mobile-menu-btn`, `.sidebar .sidebar-close-btn`; (b) bấm **Back** trên mobile mở lại drawer → reset theo `location.key`; (c) `activeModal` chết trong ProjectSetting (sinh thêm 1 cảnh báo lint) → gỡ.
+
+**Compatibility strategy**: đã chuyển **cả 7** trang Project trong Phase B vì phần chuyển là cơ học (wrapper), xác minh được bằng build + QA; không cần tách đợt.
+
+**Validation (Phase B)**
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `npm run build` | ✅ PASS — JS 948.69 KB (gzip 273.26), CSS 65.66 KB |
+| `npm run lint` | ✅ 0 error, **59 warning** (baseline 65). So danh sách theo file+rule với commit baseline: **không có cảnh báo mới** |
+| Viewport QA 13 route × 5 viewport (CDP) | ✅ Không tràn ngang document/`.app-main`/`.page-content`/`.header`; chuông + avatar luôn trong viewport; hamburger chỉ hiện <768; 1280 & 1024 sidebar 260px, 768 rail 72px, 390/375 drawer |
+| Sidebar mobile (tự động, 10 trang × 2 viewport) | ✅ mở bằng nút menu, có backdrop, body bị khoá cuộn, Esc đóng, cuộn được mở lại |
+| Interaction QA (30 kiểm tra) | ✅ 30/30: collapse desktop + lưu trạng thái; popover thông báo (Esc); menu tài khoản (click ngoài, không có danh tính giả); Retry gọi lại 4 API thật; Projects/Board hiện Error State; "Projects" active trên trang con; breadcrumb; không còn header/sidebar trùng; drawer: inert khi đóng, focus vào ✕, backdrop/✕/điều hướng/Back/đổi kích thước đều đóng đúng, focus trả về nút menu; popover thông báo nằm trong viewport 390px |
+| Regression trang không thuộc phạm vi | ✅ Login/Register/Forgot: page dump so với cuối Phase A = **0 khác biệt** |
+| Console | ✅ Không có exception / lỗi console mới (chỉ còn lỗi mạng do không có backend). Lỗi `class`→`className` đã hết |
+| Board với dữ liệu thật (kéo thả, task card, drawer, modal, realtime) | ⛔ **BLOCKED — backend unavailable (DEC-P06)**. Không ghi PASS |
+| Nhánh "thành công" của mọi trang (dữ liệu thật hiển thị trong shell mới) | ⛔ **BLOCKED** — chỉ kiểm được nhánh loading/error |
+
+**Viewport results (Phase B)**: 1280×800 ✅ · 1024×768 ✅ (sidebar đầy đủ — trước đây là rail do breakpoint 1024 của project.css) · 768×1024 ✅ rail (trước đây sidebar **biến mất, không có cách mở**) · 390×844 ✅ drawer · 375×812 ✅ drawer.
+
 ---
 
 ## Decisions
@@ -575,6 +631,12 @@ Chạy 2 lần trên cùng code cho diff = 0 → công cụ ổn định.
 - **DEC-013 (Phase A)**: Font giữ tên family `'Inter'` (không đổi sang `'Inter Variable'`) để mọi chỗ đang khai báo `'Inter'` tiếp tục đúng.
 - **DEC-014 (Phase A)**: Icon lucide định kích thước qua `svg.icon.icon-*`; `icon` mặc định 18px, `icon-sm` 14px. Chấp nhận thay đổi hiển thị này (sửa lỗi D-01).
 - **DEC-015 (Phase A)**: Khối media 1024/768 của project.css **không** gộp ở Phase A; hợp nhất breakpoint làm ở Phase B cùng sidebar mobile.
+- **DEC-016 (Phase B)**: `MainLayout` là App Shell duy nhất cho mọi trang đăng nhập (kể cả 7 trang Project); trang con không tự render Sidebar/Header. Path route không đổi.
+- **DEC-017 (Phase B)**: Đúng 1 hệ breakpoint ở `responsive.css`; hệ quả có chủ đích ở **đúng 1024px** (giờ sidebar đầy đủ) và **đúng 768px** (giờ rail thay vì sidebar biến mất).
+- **DEC-018 (Phase B)**: Lỗi request: "lõi" (không có thì nội dung trang sai) → Error State + Retry thay cả trang; "phụ" → cảnh báo inline, trang vẫn dùng được. Dùng `withFallback` để không đổi giá trị fallback và luồng logic hiện có. Không mock, không đổi API.
+- **DEC-019 (Phase B)**: Header chỉ hiện ngữ cảnh suy ra từ route (không fetch tên project trong header để tránh API trùng); tên project vẫn ở project header của trang.
+- **DEC-020 (Phase B)**: Trạng thái thu gọn sidebar desktop lưu `localStorage` (tiện ích theo người xem, đọc/ghi bọc try/catch); drawer mobile không lưu.
+- **DEC-021 (Phase B)**: Menu tài khoản/ lời chào chỉ dùng dữ liệu có thật trong `localStorage.user`; thiếu thì hiển thị trung tính, không dùng tên/email/role giữ chỗ.
 
 ### Chờ user quyết định
 
@@ -598,6 +660,19 @@ Chạy 2 lần trên cùng code cho diff = 0 → công cụ ổn định.
 | A | `src/assets/style/components.css` | Sửa | Gộp rule từ project.css, hex→token |
 | A | `src/assets/style/responsive.css` | Sửa | hex→token (overlay) |
 | A | `src/pages/Project/project.css` | Sửa | 2074→~730 dòng: bỏ 192 selector trùng, dọn section rỗng, header mới |
+| B | `src/App.jsx` | Sửa | Lồng 7 route Project vào MainLayout (path không đổi) |
+| B | `src/Layouts/MainLayout.jsx` | Sửa | App Shell: state collapse/drawer, Esc, khoá cuộn, focus, đóng khi điều hướng/resize; `class`→`className` |
+| B | `src/components/layout/SideBar/SideBar.jsx` | Sửa | Props shell, nút ✕ mobile, nút Collapse, `inert`/`role=dialog` |
+| B | `src/components/layout/SideBar/Nav/Nav.jsx` | Sửa | Projects active cho `/project*`, `.nav-badge`, `title` cho rail (logic fetch giữ nguyên) |
+| B | `src/components/layout/Header/Header.jsx` | Sửa | Ngữ cảnh theo route, popover thông báo bằng class, Esc, aria (logic fetch giữ nguyên) |
+| B | `src/components/layout/Header/DropdownHeader/DropdownHeader.jsx` | Sửa | Click ngoài/Esc, bỏ danh tính giữ chỗ, aria |
+| B | `src/components/common/ErrorState.jsx` | Mới | Error State (page/inline) + Retry |
+| B | `src/utils/requestState.js` | Mới | `withFallback`, `failureMessage` |
+| B | `src/pages/Project/{Project,ProjectBoard,ProjectList,ProjectCalendar,ProjectSetting,ProjectOverview,ProjectChart}.jsx` | Sửa | Bỏ shell tự dựng; Error State + Retry; loading trong shell |
+| B | `src/pages/AdminUsers/AdminUsers.jsx` | Sửa | Error State + Retry, kiểm tra `res.ok` |
+| B | `src/pages/Dashboard/Dasboard.jsx`, `KPI/KPI.jsx` | Sửa | Lời chào từ user thật; KPI Error State thay số 0 giả; `className` |
+| B | `src/assets/style/layouts.css`, `responsive.css`, `components.css` | Sửa | Shell/sidebar/header/notif CSS, 1 hệ breakpoint, error/loading CSS, pill tabs mobile |
+| B | `src/pages/Project/project.css` | Sửa | Gỡ media 1024/768 + rule shell (~730→547 dòng) |
 
 ---
 
@@ -627,7 +702,7 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 | ID | Mô tả | Trạng thái |
 |---|---|---|
 | KI-01 | Không có backend để kiểm tra UI với dữ liệu thật | Chờ user (DEC-P06) |
-| KI-02 | Import path sai hoa/thường (`Sidebar/SideBar.jsx`, `Sidebar/Sidebar.jsx`) — build trên Linux sẽ lỗi | Sửa ở Phase B |
+| KI-02 | ~~Import path sai hoa/thường~~ | ✅ Đã hết ở Phase B (các import này bị gỡ khi chuyển trang vào MainLayout) |
 | KI-03 | Header + Nav gọi trùng `/task/my-task`; Header gọi `/project/:id` cho từng project | Ngoài phạm vi UI (DEC-P05) |
 | KI-04 | 4 package không dùng: `axios`, `react-icons`, `chart.js`, `react-chartjs-2` | Ghi nhận, không tự gỡ |
 | KI-05 | Bundle 948 KB, không code-split | Phase L nếu được đồng ý |
@@ -637,15 +712,27 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 | KI-09 | 65 lint warning có sẵn (set-state-in-effect, exhaustive-deps…) | Không sửa trừ khi chạm đúng dòng đó |
 | KI-10 | **Đính chính (Phase A)**: ảnh Phase 0 chụp bằng `--window-size` của Edge headless (có bề rộng cửa sổ tối thiểu ~500px) nên đã phóng đại lỗi. Đo lại bằng giả lập thiết bị chuẩn: header/avatar/chuông **không** tràn ở 390px; tràn thật nằm **bên trong `.page-content`** (filter bar Board, pill tabs MyTasks, input Setting, Chart, List) | Phase B (shell) + Phase C/F (nội dung từng trang) |
 | KI-12 | `.avatar-xs` hiển thị 32px và `.checklist-add-btn` bị `.btn` đè, do họ `.btn*`/`.avatar*` trong project.css | Phase D/F/H (thay đổi hiển thị có chủ đích) |
-| KI-13 | Lỗi console `Invalid DOM property class` (JSX dùng `class=`) ở MainLayout/Dashboard | Phase B (MainLayout), Dashboard ở Phase G |
+| KI-13 | ~~Lỗi console `Invalid DOM property class`~~ | ✅ Đã sửa ở Phase B (MainLayout, Dashboard). Các widget dashboard không render (TodayTask…) vẫn dùng `class=` → Phase G |
+| KI-14 | **BLOCKED**: QA Board với dữ liệu thật (kéo thả, task card, drawer, modal tạo task, realtime socket) và nhánh "thành công" của mọi trang trong shell mới | Chờ backend (DEC-P06) |
+| KI-15 | Filter bar của Board có width cố định inline (`260px` + `150px`, nút Add Task `260px`) — chỉ render khi tải thành công nên chưa đo được ở 375/390px; dự kiến tràn | Phase C |
+| KI-16 | Tên workspace "Nang Cao Team" trong sidebar là chữ tĩnh (không có API workspace) | Ghi nhận; cần nguồn dữ liệu nếu muốn động |
+| KI-17 | Trang Projects: khi tải số task/thành viên **của từng project** lỗi, card vẫn hiện 0 (fallback cũ) — chỉ lỗi danh sách chính mới có Error State | Phase F |
+| KI-18 | MyTasks đã có thông báo lỗi riêng nhưng chưa có Retry, ô search chưa có icon | Phase F |
+| KI-19 | Nội dung trang Project vẫn thụt lề theo cấu trúc cũ (16 khoảng trắng) sau khi bỏ wrapper — giữ nguyên để diff nhỏ | Ghi nhận (chỉ định dạng) |
+| KI-20 | `.page-content` + `.page-content-inner` cùng có padding → padding kép trên một số trang (có từ trước) | Phase C/F |
 | KI-11 | `api.jsx` nằm ngoài `src/` | Ghi nhận, không di chuyển |
 
 ---
 
 ## Next Phase
 
-**Phase A — Design Foundation & CSS Consolidation** — chỉ bắt đầu khi user cho phép.
+**Phase C — Project Header + Kanban Board & Column** — chỉ bắt đầu khi user cho phép.
 
-Trước khi bắt đầu cần user trả lời: DEC-P01 (git init), DEC-P02 (font), DEC-P06 (backend). Các DEC-P còn lại có thể quyết sau.
+Đề xuất phạm vi Phase C:
+1. Tách `ProjectHeader` (tiêu đề + meta + tab) dùng chung cho 6 trang Project (hiện lặp 6 lần), gọn 1 dòng trên desktop, tab cuộn ngang trên mobile.
+2. Board: filter bar responsive (bỏ width cố định inline — KI-15), search icon lucide thay emoji, select tuần chuẩn chiều cao, chip lọc + Clear.
+3. Column: status icon theo tên cột (token `--status-*` đã có), count, nút "+" là `.icon-btn`; board full-height, thân cột cuộn riêng, header cột sticky; empty column có hướng dẫn.
+4. Drag & drop: class `is-dragging` / `is-drag-over` dùng token thay inline style — **giữ nguyên** `handleOnDragEnd`, payload `moveTask`, `isDragDisabled`, `provided.draggableProps.style`.
+5. Không đụng task card (Phase D) ngoài phần bắt buộc để cột hoạt động.
 
-Bước đầu tiên của Phase A: chụp ảnh baseline đủ 5 viewport cho mọi route (để so sánh), sau đó đối chiếu từng selector trùng giữa `project.css` và CSS global.
+Ràng buộc: phần kéo thả / dữ liệu thật vẫn **BLOCKED** cho tới khi có backend → Phase C sẽ kiểm bằng specimen/CSS + trạng thái lỗi/rỗng; cần backend để nghiệm thu đầy đủ.

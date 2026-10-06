@@ -1,9 +1,9 @@
 // src/pages/ProjectChartPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import Header from './../../components/layout/Header/Header.jsx';
-import Sidebar from './../../components/layout/Sidebar/Sidebar.jsx';
 import { fetchProjectById, fetchTasksByProject, fetchMembersByProject, fetchColumnsByProject } from '../../../api.jsx';
+import ErrorState from '../../components/common/ErrorState.jsx';
+import { withFallback, failureMessage } from '../../utils/requestState.js';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ResponsiveContainer } from 'recharts';
 import { Calendar, CalendarClock, LayoutGrid, List, Settings, UsersRound, ListChecks, Info, BarChart2, Loader2, AlertCircle } from "lucide-react";
 import "./project.css";
@@ -44,6 +44,10 @@ export default function ProjectChartPage() {
     const [loadingPage, setLoadingPage] = useState(true);
     const [loadingChart, setLoadingChart] = useState(true);
     const [errorMsg, setErrorMsg] = useState('');
+    // Requests that failed in the last load (header info / chart data); bump reloadKey to retry
+    const [infoFailures, setInfoFailures] = useState([]);
+    const [chartFailures, setChartFailures] = useState([]);
+    const [reloadKey, setReloadKey] = useState(0);
 
     // Chart Data States
     const [statusChartData, setStatusChartData] = useState([]); // Chart 1: Status
@@ -61,12 +65,13 @@ export default function ProjectChartPage() {
 
         // 1. Fetch Project Header Info
         const loadProjectInfo = async () => {
+            const failures = [];
             try {
                 setLoadingPage(true);
                 const [pData, tData, mData] = await Promise.all([
-                    fetchProjectById(activeProjectId).catch(() => null),
-                    fetchTasksByProject(activeProjectId).catch(() => []),
-                    fetchMembersByProject(activeProjectId).catch(() => [])
+                    withFallback(fetchProjectById(activeProjectId), null, failures, 'project'),
+                    withFallback(fetchTasksByProject(activeProjectId), [], failures, 'tasks'),
+                    withFallback(fetchMembersByProject(activeProjectId), [], failures, 'members')
                 ]);
 
                 setProject(pData?.data || pData);
@@ -74,20 +79,23 @@ export default function ProjectChartPage() {
                 setProjectMembers(Array.isArray(mData) ? mData : (mData?.data || []));
             } catch (err) {
                 console.error("Error loading project info:", err);
+                failures.push({ label: 'info', error: err });
             } finally {
+                setInfoFailures(failures);
                 setLoadingPage(false);
             }
         };
 
         // 2. Fetch and Process Chart & Table Data
         const loadChartData = async () => {
+            const failures = [];
             try {
                 setLoadingChart(true);
                 setErrorMsg('');
 
                 const [tasksRes, columnsRes] = await Promise.all([
-                    fetchTasksByProject(activeProjectId).catch(() => []),
-                    fetchColumnsByProject(activeProjectId).catch(() => [])
+                    withFallback(fetchTasksByProject(activeProjectId), [], failures, 'chart-tasks'),
+                    withFallback(fetchColumnsByProject(activeProjectId), [], failures, 'chart-columns')
                 ]);
 
                 const tasksList = Array.isArray(tasksRes) ? tasksRes : (tasksRes?.data || []);
@@ -183,13 +191,14 @@ export default function ProjectChartPage() {
                 console.error("Error loading chart data:", err);
                 setErrorMsg("Failed to load chart data.");
             } finally {
+                setChartFailures(failures);
                 setLoadingChart(false);
             }
         };
 
         loadProjectInfo();
         loadChartData();
-    }, [activeProjectId]);
+    }, [activeProjectId, reloadKey]);
 
     // Helper render từng bảng trạng thái
     const renderStagnantTable = (title, dataList, headerBgColor) => (
@@ -261,11 +270,24 @@ export default function ProjectChartPage() {
         </div>
     );
 
+    // Charts built from failed requests would show fake zeros — show the error instead
+    const loadFailures = [...infoFailures, ...chartFailures];
+    const coreFailure = loadFailures.find((f) => f.label !== 'members');
+    const membersFailed = loadFailures.some((f) => f.label === 'members');
+    if (!loadingPage && !loadingChart && coreFailure) {
+        return (
+            <main className="page-content">
+                <ErrorState
+                    title="Couldn't load project charts"
+                    message={failureMessage(coreFailure)}
+                    onRetry={() => setReloadKey((k) => k + 1)}
+                />
+            </main>
+        );
+    }
+
     return (
-        <div className="app-shell">
-            <Sidebar />
-            <div className="app-main">
-                <Header />
+        <>
 
                 {/* Project Header */}
                 <div className="project-header">
@@ -318,6 +340,14 @@ export default function ProjectChartPage() {
 
                 {/* Main Content Area */}
                 <main className="page-content" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                    {membersFailed && (
+                        <ErrorState
+                            variant="inline"
+                            title="Project members could not be loaded."
+                            message="The member count may be wrong."
+                            onRetry={() => setReloadKey((k) => k + 1)}
+                        />
+                    )}
                     {loadingChart ? (
                         <div style={{
                             display: 'flex',
@@ -480,7 +510,6 @@ export default function ProjectChartPage() {
                         </>
                     )}
                 </main>
-            </div>
-        </div>
+        </>
     );
 }
