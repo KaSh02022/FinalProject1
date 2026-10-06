@@ -8,7 +8,7 @@
 |---|---|
 | Cập nhật lần cuối | 2026-10-06 |
 | Trạng thái hiện tại | **Phase A + Phase B COMPLETED** (2026-10-06). Board với dữ liệu thật: **BLOCKED** (không có backend) |
-| Code đã sửa | Có — xem **Changed Files**. Git: baseline `a9ef6f4`, Phase A `4908de3`, Phase B (commit kế tiếp) |
+| Code đã sửa | Có — xem **Changed Files**. Git: baseline `a9ef6f4`, Phase A `4908de3`, Phase B `88caebf` |
 | Phase triển khai kế tiếp | Phase C — Project Header + Kanban Board & Column (**chờ user cho phép**) |
 
 ---
