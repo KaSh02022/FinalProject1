@@ -451,10 +451,12 @@
 }
 
 /* =========================
-   PROJECT HEADER + TAB STRIP
+   PROJECT HEADER + TAB STRIP  (components/project/ProjectHeader.jsx)
+   Row 1: [dot + name] [meta …]  ……  [actions]   (description: one muted line)
+   Row 2: section tabs (scroll sideways on narrow screens)
    ========================================================= */
 .project-header {
-  padding: var(--space-5) var(--space-6) 0;
+  padding: var(--space-4) var(--space-6) 0;
   background-color: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
@@ -464,13 +466,40 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-4);
 }
+.project-header-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-4);
+  row-gap: var(--space-1);
+}
+.project-header-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.project-header-loading .icon { color: var(--color-primary-600); }
 .project-title-row {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+}
+.project-title {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 32px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .project-color-dot {
   width: 10px;
@@ -482,26 +511,47 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  column-gap: var(--space-4);
-  row-gap: 4px;
-  margin-top: var(--space-2);
+  gap: var(--space-1) var(--space-2);
   color: var(--color-text-muted);
-  font-size: 12.5px;
-  gap: var(--space-4);
+  font-size: var(--text-xs);
+  list-style: none;
 }
 .project-meta-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background-color: var(--color-bg);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.project-meta-item .icon { color: var(--color-text-subtle); }
+.project-description {
+  flex-basis: 100%;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .project-header-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+.project-header-actions .icon-btn.is-active {
+  background-color: var(--color-primary-50);
+  border-color: var(--color-primary-200);
+  color: var(--color-primary-700);
 }
 
 .project-tabs {
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
   display: flex;
   align-items: center;
   gap: var(--space-5);
@@ -515,28 +565,20 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: var(--space-3) 0;
+  padding: 10px 0;
   font-size: 13.5px;
   font-weight: 500;
   color: var(--color-text-muted);
   border-bottom: 2px solid transparent;
   flex-shrink: 0;
   white-space: nowrap;
+  transition: color var(--duration-fast) ease;
 }
 .project-tab:hover { color: var(--color-text); }
+.project-tab:focus-visible { outline-offset: -2px; }
 .project-tab.active {
   color: var(--color-primary-600);
   border-bottom-color: var(--color-primary-600);
-}
-.project-tab.active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 2px;
-  border-radius: var(--radius-full);
-  background-color: var(--color-primary-600);
 }
 
 /* =========================

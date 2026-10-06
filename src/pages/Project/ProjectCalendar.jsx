@@ -1,25 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import ErrorState from '../../components/common/ErrorState.jsx';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 
 import {
-    LayoutGrid,
-    List,
     Calendar as CalendarIcon,
-    Settings,
     Plus,
     Loader2,
-    UsersRound,
-    ListChecks,
-    CalendarClock,
     ChevronLeft,
     ChevronRight,
     Trash2,
-    Calendar,
     StickyNote,
-    X, Info, BarChart2,
-} from 'lucide-react';
+    X } from 'lucide-react';
 
 import {
     fetchProjectById,
@@ -31,6 +23,8 @@ import {
     createNote,
     deleteNote
 } from '../../../api.jsx';
+
+import ProjectHeader from '../../components/project/ProjectHeader.jsx';
 
 // English month names list
 const MONTH_NAMES = [
@@ -448,48 +442,14 @@ export default function ProjectCalendar() {
                     </main>
                 ) : (
                     <>
-                        {/* Project Header */}
-                        <div className="project-header">
-                            <div className="project-header-top">
-                                <div style={{ minWidth: 0 }}>
-                                    <div className="project-title-row">
-                                        <span className="project-color-dot" style={{ background: project.color || '#4f46e5' }}></span>
-                                        <h1>{project.name || 'Project'}</h1>
-                                    </div>
-                                    <p className="page-subtitle">{project.description || 'no description'}</p>
-
-                                    <div className="project-meta-row" style={{ display: 'flex', gap: '16px', marginTop: '8px', fontSize: '13px', color: '#64748b', flexWrap: 'wrap' }}>
-                                        <span className="project-meta-item"><UsersRound className="icon icon-sm" />{projectMembers.length} members</span>
-                                        <span className="project-meta-item"><ListChecks className="icon icon-sm" />{tasks.length} tasks</span>
-                                        <span className="project-meta-item"><CalendarClock className="icon icon-sm" />start date: {formattedStartDate}</span>
-                                        <span className="project-meta-item"><CalendarClock className="icon icon-sm" />end date: {formattedDueDate}</span>
-                                    </div>
-                                </div>
-                                <div className="project-header-actions">
-                                    <Link to={`/projectsetting/${projectId}`} className="icon-btn icon-btn-outline">
-                                        <Settings className="icon" />
-                                    </Link>
-                                </div>
-                            </div>
-
-                            <nav className="project-tabs">
-                                <Link to={`/projectoverview/${projectId}`} className="project-tab">
-                                    <Info className="icon icon-sm" /> Overview
-                                </Link>
-                                <Link to={`/projectchart/${projectId}`} className="project-tab">
-                                    <BarChart2 className="icon icon-sm" /> Chart
-                                </Link>
-                                <Link to={`/projectboard/${projectId}`} className="project-tab">
-                                    <LayoutGrid className="icon icon-sm" /> Board
-                                </Link>
-                                <Link to={`/projectlist/${projectId}`} className="project-tab ">
-                                    <List className="icon icon-sm" /> Backlog
-                                </Link>
-                                <Link to={`/projectcalendar/${projectId}`} className="project-tab active">
-                                    <Calendar className="icon icon-sm" /> Calendar
-                                </Link>
-                            </nav>
-                        </div>
+                        <ProjectHeader
+                            projectId={projectId}
+                            project={project}
+                            memberCount={projectMembers.length}
+                            taskCount={tasks.length}
+                            startDate={formattedStartDate}
+                            endDate={formattedDueDate}
+                        />
 
                         {/* Main Content: Calendar */}
                         <main className="page-content" style={{ padding: '20px' }}>

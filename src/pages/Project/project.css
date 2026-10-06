@@ -349,13 +349,7 @@ svg {
     height: 16px;
 }
 
-/* ============ KANBAN CONTAINER (SCROLL NGANG CHO CỘT) ============ */
-.board.scroll-x {
-    display: flex;
-    overflow-x: auto;
-    overflow-y: hidden;
-    height: calc(100vh - 200px); /* Tùy chỉnh theo Layout */
-}
+/* ============ KANBAN SCROLLBARS (layout lives in components.css) ============ */
 
 /* Tùy chỉnh thanh cuộn ngang mượt đẹp */
 .board.scroll-x::-webkit-scrollbar {

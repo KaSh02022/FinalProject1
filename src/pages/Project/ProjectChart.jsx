@@ -1,12 +1,14 @@
 // src/pages/ProjectChartPage.jsx
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { fetchProjectById, fetchTasksByProject, fetchMembersByProject, fetchColumnsByProject } from '../../../api.jsx';
 import ErrorState from '../../components/common/ErrorState.jsx';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ResponsiveContainer } from 'recharts';
-import { Calendar, CalendarClock, LayoutGrid, List, Settings, UsersRound, ListChecks, Info, BarChart2, Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import "./project.css";
+
+import ProjectHeader from '../../components/project/ProjectHeader.jsx';
 
 const formatDateDMY = (dateValue) => {
     if (!dateValue) return 'Not set';
@@ -289,54 +291,15 @@ export default function ProjectChartPage() {
     return (
         <>
 
-                {/* Project Header */}
-                <div className="project-header">
-                    <div className="project-header-top">
-                        {loadingPage ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6b7280', padding: '12px 0' }}>
-                                <Loader2 className="animate-spin" size={20} style={{ color: '#4f46e5' }} />
-                                <span>Loading...</span>
-                            </div>
-                        ) : (
-                            <div>
-                                <div className="project-title-row">
-                                    <span className="project-color-dot" style={{ background: project?.color || '#4f46e5' }}></span>
-                                    <h1>{project?.name || 'Project'}</h1>
-                                </div>
-                                <p className="page-subtitle">{project?.description || 'No description'}</p>
-                                <div className="project-meta-row">
-                                    <span className="project-meta-item"><UsersRound className="icon icon-sm" />{projectMembers.length} members</span>
-                                    <span className="project-meta-item"><ListChecks className="icon icon-sm" />{tasks.length} tasks</span>
-                                    <span className="project-meta-item"><Calendar className="icon icon-sm" />Start Date: {formatDateDMY(project?.startDate || project?.createdAt)}</span>
-                                    <span className="project-meta-item"><CalendarClock className="icon icon-sm" />End Date: {formatDateDMY(project?.date || project?.endDate)}</span>
-                                </div>
-                            </div>
-                        )}
-
-                        <Link to={`/projectsetting/${activeProjectId}`} className="icon-btn icon-btn-outline">
-                            <Settings className="icon" />
-                        </Link>
-                    </div>
-
-                    {/* Navigation Tabs */}
-                    <nav className="project-tabs">
-                        <Link to={`/projectoverview/${activeProjectId}`} className="project-tab">
-                            <Info className="icon icon-sm" /> Overview
-                        </Link>
-                        <Link to={`/projectchart/${activeProjectId}`} className="project-tab active">
-                            <BarChart2 className="icon icon-sm" /> Chart
-                        </Link>
-                        <Link to={`/projectboard/${activeProjectId}`} className="project-tab">
-                            <LayoutGrid className="icon icon-sm" /> Board
-                        </Link>
-                        <Link to={`/projectlist/${activeProjectId}`} className="project-tab">
-                            <List className="icon icon-sm" /> Backlog
-                        </Link>
-                        <Link to={`/projectcalendar/${activeProjectId}`} className="project-tab">
-                            <Calendar className="icon icon-sm" /> Calendar
-                        </Link>
-                    </nav>
-                </div>
+                <ProjectHeader
+                    projectId={activeProjectId}
+                    project={project}
+                    memberCount={projectMembers.length}
+                    taskCount={tasks.length}
+                    startDate={formatDateDMY(project?.startDate || project?.createdAt)}
+                    endDate={formatDateDMY(project?.date || project?.endDate)}
+                    loading={loadingPage}
+                />
 
                 {/* Main Content Area */}
                 <main className="page-content" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>

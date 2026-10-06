@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import ErrorState from '../../components/common/ErrorState.jsx';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 import {
@@ -12,21 +12,15 @@ import {
 } from './../../../api.jsx';
 import "./project.css";
 import {
-    Calendar,
-    CalendarClock,
-    LayoutGrid,
-    List,
-    ListChecks,
-    Settings,
-    UsersRound,
     Loader2,
     FileText,
     Upload,
     Trash2,
     Edit3,
-    Check,
-    Info, BarChart2
-} from "lucide-react";
+    Check
+    } from "lucide-react";
+
+import ProjectHeader from '../../components/project/ProjectHeader.jsx';
 
 // Domain Backend chứa thư mục uploads
 const API_BASE_URL = "http://localhost:3000";
@@ -238,47 +232,14 @@ export default function ProjectOverview() {
     return (
         <>
 
-                {/* Project Header */}
-                <div className="project-header">
-                    <div className="project-header-top">
-                        <div>
-                            <div className="project-title-row">
-                                <span className="project-color-dot" style={{ background: project?.color || '#4f46e5' }}></span>
-                                <h1>{project?.name || 'Project'}</h1>
-                            </div>
-                            <p className="page-subtitle">{project?.description || 'No short description provided'}</p>
-
-                            <div className="project-meta-row">
-                                <span className="project-meta-item"><UsersRound className="icon icon-sm" />{projectMembers.length} Members</span>
-                                <span className="project-meta-item"><ListChecks className="icon icon-sm" />{tasks.length} Tasks</span>
-                                <span className="project-meta-item"><Calendar className="icon icon-sm" />Start Date: {formattedStartDate}</span>
-                                <span className="project-meta-item"><CalendarClock className="icon icon-sm" />End Date: {formattedDueDate}</span>
-                            </div>
-                        </div>
-                        <Link to={`/projectsetting/${projectId}`} className="icon-btn icon-btn-outline" style={{ cursor: 'pointer' }}>
-                            <Settings className="icon" />
-                        </Link>
-                    </div>
-
-                    {/* Navigation Tabs */}
-                    <nav className="project-tabs">
-                        <Link to={`/projectoverview/${projectId}`} className="project-tab active">
-                            <Info className="icon icon-sm" /> Overview
-                        </Link>
-                        <Link to={`/projectchart/${projectId}`} className="project-tab">
-                            <BarChart2 className="icon icon-sm" /> Chart
-                        </Link>
-                        <Link to={`/projectboard/${projectId}`} className="project-tab">
-                            <LayoutGrid className="icon icon-sm" /> Board
-                        </Link>
-                        <Link to={`/projectlist/${projectId}`} className="project-tab">
-                            <List className="icon icon-sm" /> Backlog
-                        </Link>
-                        <Link to={`/projectcalendar/${projectId}`} className="project-tab">
-                            <Calendar className="icon icon-sm" /> Calendar
-                        </Link>
-                    </nav>
-                </div>
+                <ProjectHeader
+                    projectId={projectId}
+                    project={project}
+                    memberCount={projectMembers.length}
+                    taskCount={tasks.length}
+                    startDate={formattedStartDate}
+                    endDate={formattedDueDate}
+                />
 
                 {/* Main Content */}
                 <main className="page-content" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>

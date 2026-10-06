@@ -1,16 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import ErrorState from '../../components/common/ErrorState.jsx';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 
 import {
-    LayoutGrid,
-    List,
-    Calendar,
-    Settings,
-    UsersRound,
-    ListChecks,
-    CalendarClock,
     Save,
     Trash2,
     Loader2,
@@ -18,9 +11,8 @@ import {
     UserPlus,
     X,
     MoreHorizontal,
-    UserCog,
-    Info, BarChart2,
-} from 'lucide-react';
+    UserCog
+    } from 'lucide-react';
 
 import {
     fetchProjectById,
@@ -32,6 +24,8 @@ import {
     inviteMember,
     deleteMemberByProject
 } from '../../../api';
+
+import ProjectHeader from '../../components/project/ProjectHeader.jsx';
 
 // Hàm lấy ngày hiện tại dạng YYYY-MM-DD (dành cho HTML input[type="date"])
 const getTodayString = () => {
@@ -408,7 +402,7 @@ export default function ProjectSetting() {
                 description: formData.description.trim(),
                 color: formData.color,
                 startDate: formData.startDate ? new Date(formData.startDate).toISOString() : null,
-                dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
+                dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null
             };
 
             const res = await updateProject(projectId, payload);
@@ -474,58 +468,14 @@ export default function ProjectSetting() {
                     </main>
                 ) : (
                     <>
-                        <div className="project-header">
-                            <div className="project-header-top">
-                                <div style={{ minWidth: 0 }}>
-                                    <div className="project-title-row">
-                                        <span className="project-color-dot" style={{ background: project?.color || '#4f46e5' }}></span>
-                                        <h1>{project?.name || 'Dự án'}</h1>
-                                    </div>
-                                    <p className="page-subtitle" style={{ maxWidth: '640px' }}>
-                                        {project?.description || 'no description'}
-                                    </p>
-
-                                    <div className="project-meta-row">
-                                        <span className="project-meta-item">
-                                            <UsersRound className="icon icon-sm" />{projectMembers.length} members
-                                        </span>
-                                        <span className="project-meta-item">
-                                            <ListChecks className="icon icon-sm" />{tasks.length} tasks
-                                        </span>
-                                        <span className="project-meta-item">
-                                            <CalendarClock className="icon icon-sm" />start date: {headerStartDate}
-                                        </span>
-                                        <span className="project-meta-item">
-                                            <CalendarClock className="icon icon-sm" />end date: {headerDueDate}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="project-header-actions">
-                                    <Link to={`/projectsetting/${projectId}`} className="icon-btn icon-btn-outline" aria-label="Project settings">
-                                        <Settings className="icon" />
-                                    </Link>
-                                </div>
-                            </div>
-
-                            <nav className="project-tabs">
-                                <Link to={`/projectoverview/${projectId}`} className="project-tab">
-                                    <Info className="icon icon-sm" /> Overview
-                                </Link>
-                                <Link to={`/projectchart/${projectId}`} className="project-tab">
-                                    <BarChart2 className="icon icon-sm" /> Chart
-                                </Link>
-                                <Link to={`/projectboard/${projectId}`} className="project-tab">
-                                    <LayoutGrid className="icon icon-sm" /> Board
-                                </Link>
-                                <Link to={`/projectlist/${projectId}`} className="project-tab">
-                                    <List className="icon icon-sm" /> Backlog
-                                </Link>
-                                <Link to={`/projectcalendar/${projectId}`} className="project-tab">
-                                    <Calendar className="icon icon-sm" /> Calendar
-                                </Link>
-                            </nav>
-                        </div>
+                        <ProjectHeader
+                            projectId={projectId}
+                            project={project}
+                            memberCount={projectMembers.length}
+                            taskCount={tasks.length}
+                            startDate={headerStartDate}
+                            endDate={headerDueDate}
+                        />
 
                         <main className="page-content" style={{ padding: 'var(--space-6)' }}>
 

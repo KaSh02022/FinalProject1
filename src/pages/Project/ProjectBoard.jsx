@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 // Import socket instance từ file socket.js của bạn
 import {socket} from './../../utils/socket.js';
@@ -18,25 +18,21 @@ import {
     fetchTaskComments,
     addComment,
     fetchTaskActivities,
-    moveTask,
+    moveTask
 } from './../../../api.jsx';
 import "./project.css";
 import ErrorState from '../../components/common/ErrorState.jsx';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 import {
-    Calendar,
-    CalendarClock,
-    LayoutGrid,
-    List,
-    ListChecks,
-    Settings,
-    UsersRound,
+    Plus,
     Loader2,
     Check,
-    X,
-    Info,
-    BarChart2
-} from "lucide-react";
+    X
+    } from "lucide-react";
+
+import ProjectHeader from '../../components/project/ProjectHeader.jsx';
+import BoardToolbar from './board/BoardToolbar.jsx';
+import BoardColumnHeader from './board/BoardColumnHeader.jsx';
 
 // Helper function định dạng ngày theo chuẩn DD/MM/YYYY
 const formatDateDMY = (dateValue) => {
@@ -1252,46 +1248,16 @@ export default function ProjectBoard({ projectId: propProjectId }) {
     return (
         <>
 
-                <div className="project-header">
-                    <div className="project-header-top">
-                        <div>
-                            <div className="project-title-row">
-                                <span className="project-color-dot" style={{ background: project?.color || '#4f46e5' }}></span>
-                                <h1>{project?.name || 'Dự án'}</h1>
-                            </div>
-                            <p className="page-subtitle">{project?.description || 'No description'}</p>
+                <ProjectHeader
+                    projectId={activeProjectId}
+                    project={project}
+                    memberCount={projectMembers.length}
+                    taskCount={tasks.length}
+                    startDate={formattedStartDate}
+                    endDate={formattedDueDate}
+                />
 
-                            <div className="project-meta-row">
-                                <span className="project-meta-item"><UsersRound className="icon icon-sm" />{projectMembers.length} members</span>
-                                <span className="project-meta-item"><ListChecks className="icon icon-sm" />{tasks.length} tasks</span>
-                                <span className="project-meta-item"><Calendar className="icon icon-sm" />start date: {formattedStartDate}</span>
-                                <span className="project-meta-item"><CalendarClock className="icon icon-sm" />end date: {formattedDueDate}</span>
-                            </div>
-                        </div>
-                        <Link to={`/projectsetting/${activeProjectId}`} className="icon-btn icon-btn-outline" style={{ cursor: 'pointer' }}>
-                            <Settings className="icon" />
-                        </Link>
-                    </div>
-                    <nav className="project-tabs">
-                        <Link to={`/projectoverview/${activeProjectId}`} className="project-tab">
-                            <Info className="icon icon-sm" /> Overview
-                        </Link>
-                        <Link to={`/projectchart/${activeProjectId}`} className="project-tab">
-                            <BarChart2 className="icon icon-sm" /> Chart
-                        </Link>
-                        <Link to={`/projectboard/${activeProjectId}`} className="project-tab active">
-                            <LayoutGrid className="icon icon-sm" /> Board
-                        </Link>
-                        <Link to={`/projectlist/${activeProjectId}`} className="project-tab">
-                            <List className="icon icon-sm" /> Backlog
-                        </Link>
-                        <Link to={`/projectcalendar/${activeProjectId}`} className="project-tab">
-                            <Calendar className="icon icon-sm" /> Calendar
-                        </Link>
-                    </nav>
-                </div>
-
-                <main className="page-content">
+                <main className="page-content page-content--board">
                     {membersFailed && (
                         <ErrorState
                             variant="inline"
@@ -1300,42 +1266,15 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                             onRetry={fetchBoardData}
                         />
                     )}
-                    <div className="filter-bar" style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
-                        <div className="input-icon-wrap" style={{ width: '260px', flexShrink: 0 }}>
-                            <span className="input-icon">🔍</span>
-                            <input
-                                className="input"
-                                placeholder="Search task name..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                style={{ width: '100%' }}
-                            />
-                        </div>
-
-                        <div style={{ width: '150px', flexShrink: 0 }}>
-                            <select
-                                className="select"
-                                value={selectedWeek}
-                                onChange={(e) => setSelectedWeek(e.target.value)}
-                                style={{ cursor: 'pointer', height: '100%' }}
-                            >
-                                <option value="all">All Weeks</option>
-                                {Array.from({ length: totalProjectWeeks }, (_, i) => i + 1).map(w => (
-                                    <option key={w} value={w}>Week {w}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {canCreateTask && (
-                            <button
-                                className="btn btn-primary"
-                                style={{ marginLeft: 'auto', flexShrink: 0, cursor: 'pointer' }}
-                                onClick={() => handleOpenCreateModal('', false)}
-                            >
-                                + Add Task
-                            </button>
-                        )}
-                    </div>
+                    <BoardToolbar
+                        searchQuery={searchQuery}
+                        onSearchChange={setSearchQuery}
+                        selectedWeek={selectedWeek}
+                        onWeekChange={setSelectedWeek}
+                        totalWeeks={totalProjectWeeks}
+                        canCreateTask={canCreateTask}
+                        onCreateTask={() => handleOpenCreateModal('', false)}
+                    />
 
                     <DragDropContext onDragEnd={handleOnDragEnd}>
                         <div className="board scroll-x" id="kanbanBoard">
@@ -1345,41 +1284,27 @@ export default function ProjectBoard({ projectId: propProjectId }) {
 
                                 return (
                                     <div className="board-column" key={column._id}>
-                                        <div className="board-column-header">
-                                            <span className="board-column-title">{column.name || column.title}</span>
-                                            <span className="board-column-count">{columnTasks.length}</span>
-                                            {canCreateTask && (
-                                                <button
-                                                    className="btn-icon"
-                                                    style={{ marginLeft: 'auto', cursor: 'pointer' }}
-                                                    onClick={() => handleOpenCreateModal(column._id, true)}
-                                                    title="Thêm task vào cột này"
-                                                >
-                                                    +
-                                                </button>
-                                            )}
-                                        </div>
+                                        <BoardColumnHeader
+                                            title={column.name || column.title}
+                                            count={columnTasks.length}
+                                            canCreateTask={canCreateTask}
+                                            onAddTask={() => handleOpenCreateModal(column._id, true)}
+                                        />
 
                                         <Droppable droppableId={String(column._id)}>
                                             {(provided, snapshot) => (
                                                 <div
-                                                    className="board-column-body"
+                                                    className={`board-column-body${snapshot.isDraggingOver ? ' is-drop-target' : ''}`}
                                                     ref={provided.innerRef}
                                                     {...provided.droppableProps}
-                                                    style={{
-                                                        minHeight: '150px',
-                                                        backgroundColor: snapshot.isDraggingOver ? 'rgba(79, 70, 229, 0.05)' : 'transparent',
-                                                        transition: 'background-color 0.2s cubic-bezier(0.2, 0, 0, 1)',
-                                                        borderRadius: '8px',
-                                                        padding: '4px'
-                                                    }}
                                                 >
                                                     {columnTasks.length === 0 ? (
-                                                        <div className="empty-state" style={{ padding: '24px 0' }}>
-                                                            <div className="empty-state-desc">
-                                                                {searchQuery || selectedWeek !== 'all' ? 'Not found' : 'Empty'}
-                                                            </div>
-                                                        </div>
+                                                        // hidden while a card hovers this column so the drop placeholder isn't pushed down
+                                                        !snapshot.isDraggingOver && (
+                                                            <p className="board-column-empty">
+                                                                {searchQuery.trim() || selectedWeek !== 'all' ? 'No tasks match the filters' : 'No tasks yet'}
+                                                            </p>
+                                                        )
                                                     ) : (
                                                         columnTasks.map((task, index) => {
                                                             const assignees = Array.isArray(task.assignees) ? task.assignees : [];
@@ -1403,31 +1328,12 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                                                                 >
                                                                     {(provided, snapshot) => (
                                                                         <div
-                                                                            className="task-card"
+                                                                            className={`task-card${canDragThisTask ? ' is-draggable' : ' is-locked'}${snapshot.isDragging ? ' is-dragging' : ''}`}
                                                                             ref={provided.innerRef}
                                                                             {...provided.draggableProps}
                                                                             {...provided.dragHandleProps}
                                                                             onClick={() => handleOpenTaskDrawer(task._id || task.id)}
-                                                                            style={{
-                                                                                ...provided.draggableProps.style,
-                                                                                opacity: snapshot.isDragging ? 0.9 : 1,
-                                                                                transform: snapshot.isDragging
-                                                                                    ? `${provided.draggableProps.style?.transform} scale(1.02) translateY(-2px)`
-                                                                                    : provided.draggableProps.style?.transform,
-                                                                                boxShadow: snapshot.isDragging
-                                                                                    ? '0 12px 20px -5px rgba(79, 70, 229, 0.25), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
-                                                                                    : '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-                                                                                transition: snapshot.isDragging
-                                                                                    ? 'box-shadow 0.2s ease, transform 0.1s ease'
-                                                                                    : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s ease',
-                                                                                cursor: canDragThisTask
-                                                                                    ? (snapshot.isDragging ? 'grabbing' : 'grab')
-                                                                                    : 'pointer',
-                                                                                marginBottom: '8px',
-                                                                                position: 'relative',
-                                                                                backgroundColor: '#ffffff',
-                                                                                borderRadius: '8px'
-                                                                            }}
+                                                                            style={provided.draggableProps.style}
                                                                         >
                                                                             <div
                                                                                 className="task-card-top"
@@ -1621,11 +1527,12 @@ export default function ProjectBoard({ projectId: propProjectId }) {
 
                                         {canCreateTask && (
                                             <button
+                                                type="button"
                                                 className="add-task-btn"
-                                                style={{ width: '260px', cursor: 'pointer', marginTop: '4px' }}
                                                 onClick={() => handleOpenCreateModal(column._id, true)}
                                             >
-                                                + Add Task
+                                                <Plus className="icon icon-sm" aria-hidden="true" />
+                                                Add task
                                             </button>
                                         )}
                                     </div>
