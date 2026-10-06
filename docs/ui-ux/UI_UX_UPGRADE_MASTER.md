@@ -7,9 +7,9 @@
 | Mục | Giá trị |
 |---|---|
 | Cập nhật lần cuối | 2026-10-06 |
-| Trạng thái hiện tại | **Phase A + Phase B COMPLETED** (2026-10-06). Board với dữ liệu thật: **BLOCKED** (không có backend) |
-| Code đã sửa | Có — xem **Changed Files**. Git: baseline `a9ef6f4`, Phase A `4908de3`, Phase B `88caebf` |
-| Phase triển khai kế tiếp | Phase C — Project Header + Kanban Board & Column (**chờ user cho phép**) |
+| Trạng thái hiện tại | **Phase A, B, C COMPLETED** (2026-10-06). Mọi kiểm thử cần dữ liệu thật: **BLOCKED — requires live backend** |
+| Code đã sửa | Có — xem **Changed Files**. Git: baseline `a9ef6f4`, Phase A `4908de3`, Phase B `88caebf`, Phase C `a5701fe` |
+| Phase triển khai kế tiếp | Phase D — Task Card (**chờ user cho phép**) |
 
 ---
 
@@ -479,7 +479,7 @@ Một hệ breakpoint duy nhất (giữ theo `responsive.css`): **sm 640 · md 7
 | 5 | Roadmap | ✅ COMPLETED (2026-10-06) |
 | A | Design Foundation & CSS Consolidation | ✅ COMPLETED (2026-10-06) |
 | B | App Shell / Sidebar / Header (+ API error state) | ✅ COMPLETED (2026-10-06) — phần cần dữ liệu thật: BLOCKED |
-| C | Project Header + Board & Column | ⬜ |
+| C | Project Header + Kanban Board | ✅ COMPLETED (2026-10-06) — phần cần dữ liệu thật: BLOCKED |
 | D | Task Card | ⬜ |
 | E | Task Detail Drawer | ⬜ |
 | F | Projects / MyTasks / Filter | ⬜ |
@@ -607,6 +607,170 @@ Chạy 2 lần trên cùng code cho diff = 0 → công cụ ổn định.
 
 **Viewport results (Phase B)**: 1280×800 ✅ · 1024×768 ✅ (sidebar đầy đủ — trước đây là rail do breakpoint 1024 của project.css) · 768×1024 ✅ rail (trước đây sidebar **biến mất, không có cách mở**) · 390×844 ✅ drawer · 375×812 ✅ drawer.
 
+
+# Phase C — COMPLETED
+
+> Ngày: 2026-10-06 · commit code `a5701fe`. Phạm vi: Project Header dùng chung, Board toolbar, cấu trúc Kanban, responsive, visual kéo thả.
+> Không đổi API, payload, socket, quyền kéo thả, `handleOnDragEnd`, `moveTask`, route. Không mock data.
+
+## Objective
+
+Màn hình Project/Kanban gọn, rõ thứ bậc, board chiếm toàn bộ phần còn lại của viewport, cột có chiều rộng nhất quán và tự cuộn, responsive tới 375px, nhất quán với foundation Phase A và App Shell Phase B; giảm trùng lặp code (header lặp 6 lần) và không để `ProjectBoard.jsx` phình thêm.
+
+## Project Header
+
+- Khảo sát 6 khối header (Board, Backlog, Calendar, Settings, Overview, Chart): **cấu trúc giống hệt** (chấm màu + tên + mô tả + 4 meta + nút Settings + 5 tab). Khác nhau chỉ ở: tab active, cách mỗi trang định dạng ngày (đã tính sẵn), chữ fallback ("Dự án"/"Project"), Chart có loading riêng cho header.
+- Tạo `src/components/project/ProjectHeader.jsx` — **không fetch, không tự tạo dữ liệu**: trang truyền `project`, `memberCount`, `taskCount` (đúng như trang đang đếm — Backlog đếm task backlog), `startDate`/`endDate` (chuỗi trang đã định dạng), `loading` (Chart). Tab active + trạng thái nút Settings suy từ route (`useLocation`).
+- Bố cục: hàng 1 = **chấm màu + tên (1 dòng, ellipsis) + meta dạng chip** (`n members`, `n tasks`, `start – end`) … **nút Settings** bên phải; mô tả 1 dòng mờ (ellipsis + `title` đầy đủ, ẩn nếu không có — thay cho chữ giữ chỗ "No description"); hàng 2 = tab. Tên rỗng → "Untitled project" (nhãn trung tính, không phải dữ liệu giả).
+- Chiều cao header (đo bằng fixture): desktop 127px (trước ~180px), tablet 155px, mobile 179px.
+- a11y: `aria-current` cho tab/nút Settings, `aria-label` cho nav tab, nút Settings, danh sách meta.
+
+## Board Toolbar
+
+- `src/pages/Project/board/BoardToolbar.jsx` (thuần trình bày, state/logic lọc vẫn ở trang).
+- **KI-15 đã sửa**: bỏ width cố định inline (`260px`, `150px`, nút `260px`). Desktop: `[search (≤320px, co giãn)] [Week ▾] ……… [+ Add task]` (flex-wrap). Mobile (<768): search chiếm 1 hàng; select tuần + nút Add task cùng hàng; chip ở dưới.
+- Emoji 🔍 → icon lucide `Search`; select có icon `ChevronDown` (trước không có mũi tên); select tuần đang lọc có trạng thái active (nền indigo nhạt).
+- **Chip bộ lọc đang áp dụng**: "Search: “…” ×", "Week N ×", "Clear all" (khi ≥2 bộ lọc) — có hover, focus-visible, nút × có `aria-label`.
+- **Chỉ dùng 2 bộ lọc có sẵn** (search theo tên, tuần). Sort / Assignee / Priority là **tính năng mới** → không tự thêm (xem DEC-024).
+
+## Kanban Structure
+
+```
+main.page-content.page-content--board   (flex column, không tự cuộn)
+├── BoardToolbar                        (cố định)
+└── .board                              (flex:1, cuộn NGANG, bleed tới mép trang)
+    └── .board-column  ×N               (cao bằng board, rộng nhất quán)
+        ├── BoardColumnHeader           status icon · tên · số task (data thật) · [+]
+        ├── .board-column-body          (Droppable, cuộn DỌC riêng)
+        │   └── .task-card ×n            (nội dung card giữ nguyên — Phase D)
+        └── .add-task-btn
+```
+- `BoardColumnHeader.jsx` + `columnStatus.js`: icon/màu trạng thái suy từ **tên cột** (to do ○, in progress ◌·, review ◉, done ✓, canceled ✕, backlog ◌; tên lạ → trung tính). Chỉ ảnh hưởng hiển thị. Màu dùng token `--status-*`.
+- Số task = `columnTasks.length` (dữ liệu thật sau lọc), không hard-code.
+- Bỏ hack `.board.scroll-x { height: calc(100vh - 200px) }` trong project.css và `max-height: calc(100vh - 280px)` của thân cột; thay bằng flex đúng nghĩa (đo được: khoảng trống đáy board = 0px ở cả 5 viewport).
+- Cột rỗng: "No tasks yet" / "No tasks match the filters" (khi đang lọc) — ẩn khi đang có card kéo qua để placeholder thả không bị đẩy xuống.
+- Nút "+" header cột: `.icon-btn` + icon `Plus` + `aria-label` (trước là ký tự "+", class `btn-icon` riêng). Nút "Add task" cuối cột: bỏ `width:260px`.
+
+## Responsive
+
+| Viewport | Cột | Board | Toolbar | Header |
+|---|---|---|---|---|
+| ≥1024 | 288px | gap 12, cuộn ngang khi thiếu chỗ | 1 hàng | 1 hàng (tên + meta) + tab |
+| 768–1023 | 272px | gap 10, gutter 20px | 1 hàng (wrap nếu cần) | meta xuống dòng khi tên dài |
+| <768 | `min(85vw, 320px)` + `scroll-snap-type: x proximity` | thấy trọn 1 cột + mép cột kế (vuốt ngang) | search / week + add / chip | tên 16px ellipsis, meta wrap, tab cuộn ngang |
+
+- Lỗi tab tràn ở mobile (Phase A) **không tái phát**: tab nằm trong vùng cuộn riêng (`tabsScrollable: true` ở 390/375).
+- Bỏ `touch-action: pan-y` (gộp từ project.css ở Phase A) trên thân cột → vuốt ngang trên cột giờ cuộn được board trên mobile.
+- Double padding (KI-20) **đã xử lý cho trang Board** (một lớp padding duy nhất + board bleed). Các trang khác giữ nguyên (KI-20 còn mở).
+
+## Drag & Drop Visual Changes
+
+Chỉ đổi **trình bày**; `handleOnDragEnd`, `moveTask` + payload, `isDragDisabled` (quyền), socket: **không đổi**.
+- Card: inline style (opacity, transform ghép `scale/translateY` vào transform của dnd, boxShadow, transition ghi đè transition của dnd, cursor, margin, nền, bo góc) → class `task-card is-draggable|is-locked [is-dragging]` + `style={provided.draggableProps.style}` **nguyên vẹn**. Đang kéo: viền indigo, `--shadow-lg`, `rotate: 1.5deg` (thuộc tính `rotate` cộng dồn với transform của dnd thay vì ghi đè), cursor `grabbing`. Card không có quyền kéo: cursor `pointer`.
+- CSS card không transition `transform` (để dnd tự animate).
+- Cột nhận thả: `is-drop-target` = nền `--color-primary-50` + **outline** dashed indigo (outline không chiếm chỗ → không nhảy layout).
+- **Sửa nguyên nhân giật layout khi kéo**: thân cột trước dùng flex `gap: 8px` **cộng** `margin-bottom: 8px` trên card — `@hello-pangea/dnd` không đo `gap`, nên khi kéo các card dịch sai vị trí. Nay chỉ dùng margin (đo: khoảng cách card = 8px).
+
+## Components Added
+
+| Component | Vị trí | Vai trò |
+|---|---|---|
+| `ProjectHeader` | `src/components/project/ProjectHeader.jsx` | Header + tab dùng chung 6 trang Project |
+| `BoardToolbar` | `src/pages/Project/board/BoardToolbar.jsx` | Search, lọc tuần, chip, Add task |
+| `BoardColumnHeader` | `src/pages/Project/board/BoardColumnHeader.jsx` | Status icon, tên, số task, nút + |
+| `getColumnStatus` | `src/pages/Project/board/columnStatus.js` | Map tên cột → icon/màu (tách riêng để không vi phạm fast-refresh) |
+
+Không tạo component trùng: dùng lại `.input-icon-wrap`, `.select-wrap`, `.icon-btn`, `.btn`, `.filter-chip*`, `ErrorState` (Phase B).
+
+## Components Refactored
+
+- `ProjectBoard.jsx` (1764 → 1699 dòng): dùng `ProjectHeader`, `BoardToolbar`, `BoardColumnHeader`; drag state bằng class; `page-content--board`. Data states Phase B giữ nguyên (LOADING / ERROR + Retry / EMPTY / SUCCESS).
+- `ProjectList`, `ProjectCalendar`, `ProjectSetting`, `ProjectOverview`, `ProjectChart`: thay khối header ~40–50 dòng bằng `<ProjectHeader …/>`, gỡ import icon/`Link` không còn dùng. (Tổng: 6 file −318/+73 dòng ở bước này.)
+
+## Changed Files
+
+| File | Loại | Ghi chú |
+|---|---|---|
+| `src/components/project/ProjectHeader.jsx` | Mới | Header dùng chung |
+| `src/pages/Project/board/BoardToolbar.jsx` | Mới | Toolbar Board |
+| `src/pages/Project/board/BoardColumnHeader.jsx` | Mới | Header cột |
+| `src/pages/Project/board/columnStatus.js` | Mới | Map trạng thái cột |
+| `src/pages/Project/ProjectBoard.jsx` | Sửa | Toolbar/cột/header mới, drag class |
+| `src/pages/Project/{ProjectList,ProjectCalendar,ProjectSetting,ProjectOverview,ProjectChart}.jsx` | Sửa | Dùng `ProjectHeader` |
+| `src/assets/style/layouts.css` | Sửa | CSS Project Header |
+| `src/assets/style/components.css` | Sửa | Board, cột, toolbar, chip, drag states, add-task |
+| `src/assets/style/responsive.css` | Sửa | Tablet/mobile cho header + board |
+| `src/pages/Project/project.css` | Sửa | Bỏ hack chiều cao board |
+
+## Validation
+
+### PASS (đã thực sự kiểm chứng)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `npm run build` | ✅ PASS — JS 944.00 KB (gzip 272.83), CSS 69.96 KB |
+| `npm run lint` | ✅ 0 error, **59 warning** — so theo file+rule với commit Phase B `181813a`: **không có cảnh báo mới** (phát sinh 5 cảnh báo trong lúc làm — 4 import icon thừa, 1 fast-refresh — đã sửa hết) |
+| Console | ✅ Không có exception / lỗi console mới (chỉ lỗi mạng do không có backend) |
+| Data states khi backend tắt (6 trang Project) | ✅ Board, Backlog, Calendar, Settings, Overview, Chart đều hiện **ErrorState + Retry**, **không** render header/dữ liệu giả (đúng như mong đợi) |
+| Viewport QA thật 8 route × 5 viewport (CDP) | ✅ Không tràn ngang document/`.app-main`/`.page-content`; hamburger chỉ <768; drawer mobile mở/đóng/khóa cuộn/Esc OK |
+| Shell interaction (bộ 30 kiểm tra Phase B) | ✅ 30/30 vẫn PASS (gồm Retry gọi lại API thật, nav active, breadcrumb, drawer, popover) |
+| Regression trang ngoài phạm vi (Dashboard, MyTasks, Admin, Projects, Login/Register/Forgot) | ✅ Page dump so với cuối Phase B: **0 khác biệt** |
+| **CSS layout fixture** (DOM cùng cấu trúc class với JSX, tiêm vào shell thật trong trình duyệt QA, không nằm trong repo) — 5 viewport | ✅ Board lấp đầy chiều cao (khoảng trống đáy 0px); `.page-content` không cuộn; board cuộn ngang; cột dài cuộn dọc riêng; cột ngắn cao bằng board; khoảng cách card 8px (margin); không card tràn ngang; cột 288/288/272/320/319px; mobile thấy trọn 1 cột; header không tràn, nút Settings trong viewport, tab cuộn ngang ở 390/375; toolbar mobile: search 1 hàng, week + Add cùng hàng; class `is-drop-target`/`is-dragging` cho đúng nền/outline/rotate/cursor và **không đổi kích thước** cột |
+
+Lưu ý: fixture **chỉ chứng minh CSS/layout**, không chứng minh dữ liệu, kéo thả hay logic.
+
+### BLOCKED — requires live backend
+
+| Hạng mục | Trạng thái |
+|---|---|
+| SUCCESS DATA STATE của Board/Header/Backlog/Calendar/Settings/Overview/Chart trong app thật | ⛔ **SUCCESS DATA STATE — BLOCKED BY BACKEND** |
+| Kanban với dữ liệu thật (cột/task thật, số đếm thật) | ⛔ BLOCKED — requires live backend |
+| Drag & drop thật (`handleOnDragEnd`, `moveTask`, rollback, quyền `isDragDisabled`, auto-scroll khi kéo trong board cuộn ngang + scroll-snap mobile) | ⛔ BLOCKED — requires live backend |
+| Realtime socket (task_created/updated/moved/deleted) | ⛔ BLOCKED — requires live backend |
+| Task card với dữ liệu thật, Task Drawer, modal tạo task | ⛔ BLOCKED — requires live backend |
+| Bộ lọc search/tuần trên dữ liệu thật, chip xoá bộ lọc | ⛔ BLOCKED — requires live backend (logic lọc không đổi) |
+| Loading state của Board trong app (chỉ thấy thoáng qua trước khi lỗi) | ⚠️ Chỉ quan sát được dạng chuyển tiếp, không nghiệm thu riêng |
+
+### Screenshot QA
+
+- Trước/sau Phase C với backend tắt: cả hai đều là **ErrorState** (giống nhau — đúng kỳ vọng).
+- Ảnh fixture (layout CSS): desktop 1280 thấy 4+ cột, cột "To Do" dài tự cuộn, cột rỗng có ô gợi ý viền đứt, chip lọc + "Clear all"; 390px: header 2 dòng meta, tab cuộn, toolbar 2 hàng, 1 cột đầy đủ + mép cột kế. Ảnh **không** dùng để kết luận dữ liệu thật.
+
+## Backend Blockers
+
+Giữ nguyên DEC-P06: không có backend cổng 3000 → mọi nghiệm thu cần dữ liệu thật ở trên là **BLOCKED**. Khi có backend cần chạy: kéo thả trong/giữa cột (kể cả ở 390px với scroll-snap), rollback khi `moveTask` lỗi, card không có quyền không kéo được, Leader "Not Accept" ở cột Done, realtime 2 tab, search/tuần + chip, Add task từ toolbar và từ header cột.
+
+## Known Issues
+
+- **KI-15 ✅ đã sửa** (filter bar width cố định).
+- **KI-20 ◐ một phần**: double padding đã xử lý ở Board; các trang khác (main có padding inline) còn lại → Phase F.
+- **KI-21 (mới)**: Board chưa có Sort / Assignee / Priority filter — cần user quyết vì là tính năng mới (DEC-024).
+- **KI-22 (mới)**: icon trạng thái cột suy từ tên cột (cột do người dùng đặt tên) → tên lạ hiển thị icon trung tính. Nếu backend có trường trạng thái/vị trí chuẩn, nên map theo trường đó.
+- **KI-23 (mới)**: Nội dung task card (badge W/pts/On Track, nút "Not Accept" tuyệt đối, avatar `.task-assignee-avatar`) vẫn inline style — **Phase D**.
+- **KI-24 (mới)**: Ở tablet/desktop hẹp, tên project dài khiến meta xuống dòng (header 155px) — chấp nhận để không cắt tên quá sớm.
+- KI-12 (`.avatar-xs` 32px), KI-16 (workspace tĩnh), KI-17 (project card hiện 0) — **không đụng** trong Phase C theo yêu cầu.
+
+## Decisions
+
+- **DEC-022 (Phase C)**: `ProjectHeader` là component trình bày thuần: không fetch, nhận giá trị trang đã tính/định dạng; tab active suy từ route. Nằm ở `src/components/project/` vì dùng chung 6 trang.
+- **DEC-023 (Phase C)**: Component chỉ Board dùng (`BoardToolbar`, `BoardColumnHeader`, `columnStatus`) đặt cạnh trang tại `src/pages/Project/board/`.
+- **DEC-024 (Phase C)**: Không thêm Sort/Assignee/Priority filter (tính năng mới, chưa được duyệt); toolbar đã có chỗ để thêm nhóm control khi được duyệt.
+- **DEC-025 (Phase C)**: Kanban layout = `page-content--board` không cuộn + board cuộn ngang + thân cột cuộn dọc; cột 288 / 272 / `min(85vw,320px)` + scroll-snap proximity trên mobile.
+- **DEC-026 (Phase C)**: Khoảng cách card trong cột chỉ dùng margin (không flex gap) vì @hello-pangea/dnd; drop target dùng outline; card kéo dùng `rotate` (không ghi đè transform của dnd); không transition `transform` trong CSS card.
+- **DEC-027 (Phase C)**: Header bỏ chữ giữ chỗ "No description"/"no description" (ẩn khi rỗng); tên rỗng hiện "Untitled project".
+
+## Next Phase
+
+**Phase D — Task Card** — chỉ bắt đầu khi user cho phép.
+
+Đề xuất:
+1. Tách `TaskCard` khỏi `ProjectBoard.jsx` (component trình bày; giữ nguyên `Draggable`, `provided`, `snapshot`, quyền, handler).
+2. Hierarchy: priority (`.priority-tag` đã có CSS từ Phase A) → tiêu đề (2 dòng) → meta 1 hàng (tuần · điểm · checklist nếu có) → trạng thái hạn **chỉ khi Overdue/Expiring** (bỏ badge "On Track", DEC-002) → avatar group.
+3. Avatar: dùng `.avatar` + `.avatar-group`, màu ổn định theo user, tối đa 3 + "+n"; xử lý KI-12 (`.avatar-xs`) vì card dùng trực tiếp.
+4. Nút "Not Accept" (Leader/Manager, cột Done): icon-btn có nhãn/tooltip, hiện khi hover/focus, luôn hiện trên cảm ứng; **giữ nguyên** `handleLeaderDecisionOnTask`.
+5. Card: `role="button"`/`tabIndex`, Enter mở drawer.
+6. Nghiệm thu card với dữ liệu thật vẫn **BLOCKED** cho tới khi có backend; Phase D chỉ có thể kiểm bằng build/lint/fixture CSS.
+
 ---
 
 ## Decisions
@@ -636,6 +800,7 @@ Chạy 2 lần trên cùng code cho diff = 0 → công cụ ổn định.
 - **DEC-018 (Phase B)**: Lỗi request: "lõi" (không có thì nội dung trang sai) → Error State + Retry thay cả trang; "phụ" → cảnh báo inline, trang vẫn dùng được. Dùng `withFallback` để không đổi giá trị fallback và luồng logic hiện có. Không mock, không đổi API.
 - **DEC-019 (Phase B)**: Header chỉ hiện ngữ cảnh suy ra từ route (không fetch tên project trong header để tránh API trùng); tên project vẫn ở project header của trang.
 - **DEC-020 (Phase B)**: Trạng thái thu gọn sidebar desktop lưu `localStorage` (tiện ích theo người xem, đọc/ghi bọc try/catch); drawer mobile không lưu.
+- **DEC-022 … DEC-027 (Phase C)**: xem mục *Phase C — COMPLETED › Decisions*.
 - **DEC-021 (Phase B)**: Menu tài khoản/ lời chào chỉ dùng dữ liệu có thật trong `localStorage.user`; thiếu thì hiển thị trung tính, không dùng tên/email/role giữ chỗ.
 
 ### Chờ user quyết định
@@ -673,6 +838,9 @@ Chạy 2 lần trên cùng code cho diff = 0 → công cụ ổn định.
 | B | `src/pages/Dashboard/Dasboard.jsx`, `KPI/KPI.jsx` | Sửa | Lời chào từ user thật; KPI Error State thay số 0 giả; `className` |
 | B | `src/assets/style/layouts.css`, `responsive.css`, `components.css` | Sửa | Shell/sidebar/header/notif CSS, 1 hệ breakpoint, error/loading CSS, pill tabs mobile |
 | B | `src/pages/Project/project.css` | Sửa | Gỡ media 1024/768 + rule shell (~730→547 dòng) |
+| C | `src/components/project/ProjectHeader.jsx`, `src/pages/Project/board/{BoardToolbar.jsx,BoardColumnHeader.jsx,columnStatus.js}` | Mới | Xem Phase C › Components Added |
+| C | `src/pages/Project/{ProjectBoard,ProjectList,ProjectCalendar,ProjectSetting,ProjectOverview,ProjectChart}.jsx` | Sửa | Dùng ProjectHeader; Board toolbar/cột/drag class |
+| C | `src/assets/style/{layouts,components,responsive}.css`, `src/pages/Project/project.css` | Sửa | Header, board, toolbar, chip, drag states, responsive; bỏ hack chiều cao board |
 
 ---
 
@@ -714,19 +882,27 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 | KI-12 | `.avatar-xs` hiển thị 32px và `.checklist-add-btn` bị `.btn` đè, do họ `.btn*`/`.avatar*` trong project.css | Phase D/F/H (thay đổi hiển thị có chủ đích) |
 | KI-13 | ~~Lỗi console `Invalid DOM property class`~~ | ✅ Đã sửa ở Phase B (MainLayout, Dashboard). Các widget dashboard không render (TodayTask…) vẫn dùng `class=` → Phase G |
 | KI-14 | **BLOCKED**: QA Board với dữ liệu thật (kéo thả, task card, drawer, modal tạo task, realtime socket) và nhánh "thành công" của mọi trang trong shell mới | Chờ backend (DEC-P06) |
-| KI-15 | Filter bar của Board có width cố định inline (`260px` + `150px`, nút Add Task `260px`) — chỉ render khi tải thành công nên chưa đo được ở 375/390px; dự kiến tràn | Phase C |
+| KI-15 | ~~Filter bar của Board có width cố định inline~~ | ✅ Đã sửa ở Phase C (BoardToolbar responsive) |
 | KI-16 | Tên workspace "Nang Cao Team" trong sidebar là chữ tĩnh (không có API workspace) | Ghi nhận; cần nguồn dữ liệu nếu muốn động |
 | KI-17 | Trang Projects: khi tải số task/thành viên **của từng project** lỗi, card vẫn hiện 0 (fallback cũ) — chỉ lỗi danh sách chính mới có Error State | Phase F |
 | KI-18 | MyTasks đã có thông báo lỗi riêng nhưng chưa có Retry, ô search chưa có icon | Phase F |
 | KI-19 | Nội dung trang Project vẫn thụt lề theo cấu trúc cũ (16 khoảng trắng) sau khi bỏ wrapper — giữ nguyên để diff nhỏ | Ghi nhận (chỉ định dạng) |
-| KI-20 | `.page-content` + `.page-content-inner` cùng có padding → padding kép trên một số trang (có từ trước) | Phase C/F |
+| KI-20 | `.page-content` + `.page-content-inner` / padding inline → padding kép trên một số trang | ◐ Board đã xử lý ở Phase C; các trang khác → Phase F |
+| KI-21 | Board chưa có Sort / Assignee / Priority filter (tính năng mới) | Chờ user quyết (DEC-024) |
+| KI-22 | Icon trạng thái cột suy từ tên cột; tên lạ → icon trung tính | Ghi nhận; nên map theo trường trạng thái nếu backend có |
+| KI-23 | Nội dung task card còn inline style (badge W/pts/On Track, nút Not Accept, avatar) | Phase D |
+| KI-24 | Tên project dài làm meta header xuống dòng ở tablet (header ~155px) | Chấp nhận (không cắt tên quá sớm) |
 | KI-11 | `api.jsx` nằm ngoài `src/` | Ghi nhận, không di chuyển |
 
 ---
 
 ## Next Phase
 
-**Phase C — Project Header + Kanban Board & Column** — chỉ bắt đầu khi user cho phép.
+**Phase D — Task Card** — chỉ bắt đầu khi user cho phép. Chi tiết đề xuất: xem *Phase C — COMPLETED › Next Phase*.
+
+<details><summary>Đề xuất Phase C trước đây (đã thực hiện)</summary>
+
+**Phase C — Project Header + Kanban Board & Column**
 
 Đề xuất phạm vi Phase C:
 1. Tách `ProjectHeader` (tiêu đề + meta + tab) dùng chung cho 6 trang Project (hiện lặp 6 lần), gọn 1 dòng trên desktop, tab cuộn ngang trên mobile.
@@ -736,3 +912,5 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 5. Không đụng task card (Phase D) ngoài phần bắt buộc để cột hoạt động.
 
 Ràng buộc: phần kéo thả / dữ liệu thật vẫn **BLOCKED** cho tới khi có backend → Phase C sẽ kiểm bằng specimen/CSS + trạng thái lỗi/rỗng; cần backend để nghiệm thu đầy đủ.
+
+</details>
