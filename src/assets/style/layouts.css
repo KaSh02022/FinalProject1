@@ -23,6 +23,7 @@
 .page-content {
   flex: 1;
   overflow-y: auto;
+  padding: var(--space-6);
 }
 
 /* =========================
@@ -43,7 +44,7 @@
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: 0 var(--space-4);
   border-bottom: 1px solid var(--color-border);
   overflow: hidden;
@@ -53,11 +54,13 @@
   height: 32px;
   border-radius: var(--radius-md);
   background-color: var(--color-primary-600);
-  color: #fff;
+  color: var(--color-on-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  font-weight: 700;
+  font-size: 14px;
 }
 .sidebar-brand-name {
   font-size: 15px;
@@ -66,7 +69,7 @@
 }
 
 .sidebar-workspace {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
 .sidebar-workspace-label {
@@ -75,10 +78,11 @@
   text-transform: uppercase;
   letter-spacing: .04em;
   color: var(--color-text-subtle);
+  margin-bottom: var(--space-1);
 }
 .sidebar-workspace-name {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -90,12 +94,12 @@
   padding: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 .sidebar-section-label {
   margin-top: var(--space-3);
   margin-bottom: 4px;
-  padding: 0 var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-1);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -110,13 +114,13 @@
   height: 38px;
   padding: 0 var(--space-3);
   border-radius: var(--radius-md);
-  color: var(--color-slate-700);
-  font-size: 14px;
+  color: var(--color-text-muted);
+  font-size: 13.5px;
   font-weight: 500;
   transition: background-color .15s ease, color .15s ease;
 }
-.nav-item:hover { background-color: var(--color-slate-100); color: var(--color-text); }
-.nav-item.active { background-color: var(--color-primary-600); color: #fff; }
+.nav-item:hover { background-color: var(--color-surface-hover); color: var(--color-text); }
+.nav-item.active { background-color: var(--color-primary-600); color: var(--color-on-primary); }
 .nav-item .icon { flex-shrink: 0; }
 .nav-item span.nav-label {
   white-space: nowrap;
@@ -164,8 +168,9 @@
   border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: 0 var(--space-4);
+  gap: var(--space-4);
+  padding: 0 var(--space-5);
+  justify-content: space-between;
 }
 
 .mobile-menu-btn { display: none; }
@@ -202,7 +207,7 @@
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   flex-shrink: 0;
 }
 
@@ -212,7 +217,7 @@
 .command-palette-overlay {
   position: fixed;
   inset: 0;
-  background: rgb(15 23 42 / 0.4);
+  background: var(--color-overlay);
   z-index: 70;
   display: flex;
   justify-content: center;
@@ -315,6 +320,7 @@
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
+  margin-bottom: var(--space-4);
 }
 .project-title-row {
   display: flex;
@@ -333,14 +339,15 @@
   align-items: center;
   column-gap: var(--space-4);
   row-gap: 4px;
-  margin-top: 8px;
+  margin-top: var(--space-2);
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: 12.5px;
+  gap: var(--space-4);
 }
 .project-meta-item {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 .project-header-actions {
   display: flex;
@@ -352,24 +359,36 @@
   margin-top: var(--space-4);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-5);
+  /* narrow screens: tabs scroll sideways instead of overflowing the page */
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.project-tabs::-webkit-scrollbar { display: none; }
 .project-tab {
   position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px var(--space-3);
-  font-size: 14px;
+  padding: var(--space-3) 0;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--color-text-muted);
+  border-bottom: 2px solid transparent;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .project-tab:hover { color: var(--color-text); }
-.project-tab.active { color: var(--color-primary-700); }
+.project-tab.active {
+  color: var(--color-primary-600);
+  border-bottom-color: var(--color-primary-600);
+}
 .project-tab.active::after {
   content: '';
   position: absolute;
-  left: 0; right: 0; bottom: -1px;
+  left: 0;
+  right: 0;
+  bottom: -1px;
   height: 2px;
   border-radius: var(--radius-full);
   background-color: var(--color-primary-600);
@@ -381,15 +400,17 @@
 .settings-layout {
   display: flex;
   height: 100%;
+  gap: var(--space-6);
+  align-items: flex-start;
 }
 .settings-nav {
-  width: 208px;
+  width: 200px;
   flex-shrink: 0;
   border-right: 1px solid var(--color-border);
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
 }
 .settings-nav-item {
   display: block;
@@ -397,19 +418,25 @@
   text-align: left;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--color-text-muted);
 }
 .settings-nav-item:hover { background-color: var(--color-surface-hover); }
-.settings-nav-item.active { background-color: var(--color-primary-600); color: #fff; }
+.settings-nav-item.active { background-color: var(--color-primary-50); color: var(--color-primary-700); }
 .settings-nav-item.danger-item { color: var(--color-danger); }
 .settings-content {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-6);
+  width: 100% !important;
+  max-width: none !important;
 }
-.settings-section { display: none; max-width: 512px; }
+.settings-section {
+  display: none;
+  max-width: none !important;
+  width: 100% !important;
+}
 .settings-section.active { display: block; }
 .settings-section-title { font-size: 16px; font-weight: 600; }
 .settings-section-desc { margin-top: 4px; font-size: 14px; color: var(--color-text-muted); }

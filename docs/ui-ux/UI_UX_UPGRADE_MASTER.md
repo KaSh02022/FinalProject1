@@ -477,7 +477,7 @@ Một hệ breakpoint duy nhất (giữ theo `responsive.css`): **sm 640 · md 7
 | 3 | Đề xuất thiết kế | ✅ COMPLETED (2026-10-06) |
 | 4 | Tạo tài liệu master | ✅ COMPLETED (2026-10-06) |
 | 5 | Roadmap | ✅ COMPLETED (2026-10-06) |
-| A | Design Foundation & CSS Consolidation | ⏳ CHỜ DUYỆT |
+| A | Design Foundation & CSS Consolidation | ✅ COMPLETED (2026-10-06) |
 | B | App Shell / Sidebar / Header | ⬜ Chưa bắt đầu |
 | C | Project Header + Board & Column | ⬜ |
 | D | Task Card | ⬜ |
@@ -499,6 +499,58 @@ Một hệ breakpoint duy nhất (giữ theo `responsive.css`): **sm 640 · md 7
 - **Issues**: không có backend để xem board có dữ liệu.
 - **Next phase**: Phase A (chờ duyệt).
 
+### Bước 0 — Git baseline — COMPLETED
+
+- Project chưa có Git → `git init` (branch `master`).
+- `.gitignore` đã có `node_modules`, `dist`, `*.log`, `*.local`; **bổ sung**: `.qa/`, `qa-screenshots/`, `*.tmp`, `.env`, `.env.*`.
+- Danh tính Git: dùng cấu hình **toàn cục sẵn có** của máy (`Cao Son`) — không tạo danh tính mới, không sửa cấu hình Git.
+- Baseline commit: **`a9ef6f4` — "chore: baseline before ui ux upgrade"** (55 file, gồm cả tài liệu Phase 0–5). Không có `node_modules`/`dist` trong commit.
+- Rollback về trước nâng cấp: `git checkout a9ef6f4 -- .`
+
+### Phase A — Design Foundation & CSS Consolidation — COMPLETED
+
+**Objective**: một nguồn token + primitives, giảm trùng lặp CSS mà không gây regression, font local, bổ sung utility bị thiếu.
+
+**Phương pháp kiểm chứng (dùng lại cho các phase sau)** — script QA nằm ngoài repo (scratchpad của phiên); mô tả để tái tạo:
+1. *Specimen diff*: với **mỗi selector** trong stylesheet đang chạy (591 selector, gồm 43 tổ hợp class lấy từ `className` trong JSX), dựng 1 phần tử DOM khớp selector (pseudo-class `:hover/:focus/...` được ép bằng rule nhân bản ngay sau rule gốc để giữ vị trí cascade), đo ~90 thuộc tính computed style ở 5 viewport, so trước/sau. Cách này bao phủ cả UI không render được do thiếu backend (task card, modal, drawer…).
+2. *Page dump diff*: computed style + toạ độ của **mọi phần tử** (8.435 phần tử) trên 13 route × 5 viewport.
+3. *Overflow/console QA*: đo `scrollWidth` của document và các container (`.app-main`, `.page-content`, `.header`, `.project-header`), phần tử ra ngoài viewport, nút menu, lỗi console; chụp ảnh. Viewport giả lập bằng CDP `Emulation.setDeviceMetricsOverride` (Chrome headless).
+Chạy 2 lần trên cùng code cho diff = 0 → công cụ ổn định.
+
+**Implemented**
+
+1. **Gộp CSS trùng lặp** (`project.css` → CSS chung), tự động bằng PostCSS + kiểm chứng:
+   - `project.css` nằm **cuối bundle** → giá trị của nó là giá trị đang hiệu lực trên mọi trang. Quy tắc gộp: chép giá trị `project.css` đè lên rule gốc cùng selector trong `style/layouts/components.css`, rồi xoá khỏi `project.css`.
+   - **192 selector** đã gộp (gồm 74 trùng y hệt), `:root` trùng đã gỡ.
+   - Lần gộp đầu, specimen diff phát hiện **27 khác biệt** do dời vị trí cascade (vd. `.btn` của project.css đang đè `gap` của `.btn-sm`; `.avatar` đè kích thước `.avatar-xs`; `.mobile-menu-btn`, `.header-search`, `.project-header` đè media query của responsive.css). → Hoàn tác, **giữ nguyên các họ `.btn*`, `.avatar*`, `.mobile-menu-btn`, `.header-search*`, `.project-header` trong project.css**, gộp lại → **diff = 0**.
+   - Dọn sau gộp: bỏ khai báo thừa, rule tách lặp giá trị rule nhóm, 37 tiêu đề section rỗng; viết lại header file `project.css` mô tả đúng vai trò.
+   - Kết quả: `project.css` 2074 → **~730 dòng**; CSS bundle 70.22 KB → **61.96 KB**.
+   - **Chưa gộp** (có chủ đích): 2 khối media `max-width: 1024px / 768px` của project.css (điều khiển sidebar/header mobile, xung đột với hệ 1023/767 của responsive.css) → **Phase B**, vì gắn trực tiếp với lỗi điều hướng mobile.
+2. **Token** (chỉ bổ sung, không đổi giá trị cũ) trong `style.css`: `--space-8/10`, `--color-surface-sunken`, `--color-on-primary`, `--color-overlay`, `--status-*` (6 trạng thái cột), `--font-sans`, `--text-xs…lg`, `--duration-fast/normal`, `--ease-out`, thang `--z-*`, `--color-priority-high-text/medium-text`.
+3. **Hex → token** trong `layouts.css`, `components.css`, `responsive.css`, `project.css`: chỉ thay khi **giá trị bằng nhau tuyệt đối** (`#e2e8f0`→`--color-border`, `#cbd5e1`, `#94a3b8`, `#f1f5f9`, `#f8fafc`, `#fff`→`--color-surface`/`--color-on-primary`, `rgb(15 23 42/.4)`→`--color-overlay`, `9999px`→`--radius-full`). Bảng màu label (`#ffedd5`…) giữ nguyên.
+4. **Font Inter local** (DEC-P02): 3 file woff2 variable (latin, latin-ext, **vietnamese**) + LICENSE (SIL OFL) tại `src/assets/fonts/inter/`; `@font-face` ở đầu `style.css` (`font-display: swap`, `unicode-range`). Gỡ `preconnect` + stylesheet Google Fonts khỏi `index.html`. `body` dùng `--font-sans` (fallback: system-ui, Segoe UI, Roboto, Helvetica Neue, Arial).
+5. **Utility thiếu**: `.animate-spin` (spinner `Loader2` ở 8 page trước đây không quay); `svg.icon` + `svg.icon.icon-xs…xl` (lucide đặt class lên chính `<svg>` nên rule cũ `.icon-sm svg` không áp dụng → icon 24px); `.priority-tag.priority-{low,medium,high,urgent}` (class đang dùng trên task card nhưng chưa từng có CSS); `prefers-reduced-motion`.
+6. **Regression do chính Phase A gây ra và đã sửa**: trước đây icon 24px trong tab project bị flexbox ép về 0px ở mobile (vô tình ẩn); khi icon có kích thước đúng, thanh tab tràn 449px ở 390px. Sửa gốc: `.project-tabs` cuộn ngang (ẩn scrollbar), `.project-tab` không co/xuống dòng.
+
+**Changed files (Phase A)**: `index.html`, `src/assets/style/style.css`, `layouts.css`, `components.css`, `responsive.css`, `src/pages/Project/project.css`; mới: `src/assets/fonts/inter/*` (3 woff2 + LICENSE.txt). **Không sửa file JSX nào.**
+
+**Validation (Phase A)**
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `npm run build` | ✅ PASS — JS 948.40 KB (không đổi), CSS **61.96 KB** (từ 70.22), 3 font woff2 được bundle; không còn tham chiếu `fonts.googleapis/gstatic` |
+| `npm run lint` | ✅ 0 error, **65 warning** (bằng baseline) |
+| Specimen diff (591 selector × 5 viewport) | ✅ Chỉ 2 loại khác biệt **có chủ đích**: `font-family` (chuỗi fallback mới) và bán kính pill `9999px→999px` (hình dạng giống hệt) |
+| Page dump diff (8.435 phần tử × 65 trang) | ✅ Chỉ khác biệt có chủ đích: font-family; icon lucide `icon-sm` 24→14px, `icon` 24→18px và dịch chuyển vị trí nhỏ kéo theo (tab project thấp hơn ~4px) |
+| Font trong trình duyệt | ✅ 3 face Inter `loaded`, request font tới `localhost:5179`, không có request ra ngoài; glyph tiếng Việt dùng subset vietnamese |
+| Overflow 5 viewport | ✅ Không có tràn mới. **Cải thiện**: `app-main`/`project-header` hết tràn ở 375px. Tràn bên trong `.page-content` (Board/List/Chart/Setting/MyTasks ở ≤390px) **giống baseline** → Phase B |
+| Console | Không có lỗi mới. Lỗi có sẵn: `class`→`className` (MainLayout/Dashboard) |
+
+**Technical debt còn lại sau Phase A**
+- Họ `.btn*`, `.avatar*` vẫn ở `project.css` vì đang đè rule chung qua thứ tự cascade. Hệ quả thực tế hiện tại: `.avatar-xs` hiển thị **32px** (thay vì 20px), `.checklist-add-btn` bị `.btn` đè `display`/`color`. Chỉ chuyển khi chấp nhận thay đổi hiển thị có chủ đích (Phase D/F/H).
+- ~450 inline style và ~340 hex trong JSX **chưa đụng** (Phase A không sửa JSX).
+- Breakpoint kép (1024/768 vs 1023/767) → Phase B.
+
 ---
 
 ## Decisions
@@ -516,15 +568,19 @@ Một hệ breakpoint duy nhất (giữ theo `responsive.css`): **sm 640 · md 7
 - **DEC-009**: Không đổi API, payload, socket event, quyền kéo thả, route path. Refactor chỉ ở tầng trình bày.
 - **DEC-010**: Không hiển thị dữ liệu mock/hard-code; widget thiếu API thì ẩn và ghi Known Issue.
 - **DEC-011**: Lỗi API phải hiện Error state (có Retry), không giả làm trạng thái rỗng.
+- **DEC-P01 — Git baseline — APPROVED (2026-10-06)**: `git init` + baseline commit `a9ef6f4` trước khi sửa UI; không đưa build/node_modules/file tạm vào Git; dùng danh tính Git sẵn có, không sửa cấu hình toàn cục.
+- **DEC-P02 — Local Inter — APPROVED (2026-10-06)**: bỏ Google Fonts CDN; Inter variable woff2 (latin, latin-ext, vietnamese) trong `src/assets/fonts/inter/`, `@font-face` trong `style.css`; giữ typography hiện tại, fallback system-ui/Segoe UI/Roboto/Arial.
+- **DEC-P06 — Backend unavailable / no mock data — BLOCKED (2026-10-06)**: không đoán vị trí backend, không tạo backend, không đổi API endpoint, không tạo mock data, không che lỗi API bằng empty state. Phần cần dữ liệu thật ghi **BLOCKED**; QA Board với dữ liệu thật làm khi có backend.
+- **DEC-012 (Phase A)**: Gộp CSS chỉ được chấp nhận khi specimen diff + page dump diff = 0 (hoặc chỉ còn khác biệt có chủ đích đã liệt kê). Selector mà việc dời vị trí làm đổi cascade thì **giữ lại** trong project.css và ghi nợ kỹ thuật.
+- **DEC-013 (Phase A)**: Font giữ tên family `'Inter'` (không đổi sang `'Inter Variable'`) để mọi chỗ đang khai báo `'Inter'` tiếp tục đúng.
+- **DEC-014 (Phase A)**: Icon lucide định kích thước qua `svg.icon.icon-*`; `icon` mặc định 18px, `icon-sm` 14px. Chấp nhận thay đổi hiển thị này (sửa lỗi D-01).
+- **DEC-015 (Phase A)**: Khối media 1024/768 của project.css **không** gộp ở Phase A; hợp nhất breakpoint làm ở Phase B cùng sidebar mobile.
 
 ### Chờ user quyết định
 
-- **DEC-P01**: `git init` + commit baseline trước Phase A để có điểm rollback? *(Khuyến nghị: Có)*
-- **DEC-P02**: Font Inter: giữ Google Fonts CDN hay self-host `.woff2` trong `public/fonts`? *(Khuyến nghị: self-host nếu app chạy offline/LAN; nếu không thì giữ)*
 - **DEC-P03**: Có làm dark mode không? *(Khuyến nghị: chuẩn bị token ngay, bật dark ở Phase K nếu còn thời gian)*
 - **DEC-P04**: Gộp logic 2 bản `TaskDrawer` (Board + MyTasks) hay chỉ đồng bộ giao diện? *(Khuyến nghị: chỉ đồng bộ giao diện trước)*
 - **DEC-P05**: Có được sửa `Header`/`Nav` để không gọi trùng API `/task/my-task` và N lần `/project/:id`? *(Ngoài phạm vi UI thuần; khuyến nghị: để sau)*
-- **DEC-P06**: Đường dẫn backend (port 3000) để chạy kiểm tra Board với dữ liệu thật?
 
 ---
 
@@ -534,6 +590,14 @@ Một hệ breakpoint duy nhất (giữ theo `responsive.css`): **sm 640 · md 7
 |---|---|---|---|
 | 0–5 | `docs/ui-ux/UI_UX_UPGRADE_MASTER.md` | Mới | Tài liệu này |
 | 0–5 | `node_modules/` | Cài đặt | `npm ci` theo lockfile, không đổi `package.json`/`package-lock.json` |
+| 0 | `.gitignore` | Sửa | Thêm `.qa/`, `qa-screenshots/`, `*.tmp`, `.env`, `.env.*` |
+| A | `index.html` | Sửa | Gỡ Google Fonts (preconnect + stylesheet) |
+| A | `src/assets/fonts/inter/*.woff2`, `LICENSE.txt` | Mới | Inter variable local (latin, latin-ext, vietnamese), SIL OFL |
+| A | `src/assets/style/style.css` | Sửa | @font-face, token mới, gộp rule từ project.css, `svg.icon-*`, `.animate-spin`, `.priority-tag`, reduced-motion |
+| A | `src/assets/style/layouts.css` | Sửa | Gộp rule từ project.css, hex→token, `.project-tabs` cuộn ngang |
+| A | `src/assets/style/components.css` | Sửa | Gộp rule từ project.css, hex→token |
+| A | `src/assets/style/responsive.css` | Sửa | hex→token (overlay) |
+| A | `src/pages/Project/project.css` | Sửa | 2074→~730 dòng: bỏ 192 selector trùng, dọn section rỗng, header mới |
 
 ---
 
@@ -571,7 +635,9 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 | KI-07 | Board chưa có sort/group (Linear có) | Ngoài phạm vi (không thêm tính năng) |
 | KI-08 | Widget dashboard (TodayTask, UCMDeadlines, RecentActivity, TaskCompletion, TeamWorkload, ProjectStatus) chứa dữ liệu mock tĩnh, hiện không được render | Xử lý ở Phase G theo DEC-010 |
 | KI-09 | 65 lint warning có sẵn (set-state-in-effect, exhaustive-deps…) | Không sửa trừ khi chạm đúng dòng đó |
-| KI-10 | Nguyên nhân chính xác của tràn ngang ở 390px chưa đo bằng DevTools | Điều tra đầu Phase B |
+| KI-10 | **Đính chính (Phase A)**: ảnh Phase 0 chụp bằng `--window-size` của Edge headless (có bề rộng cửa sổ tối thiểu ~500px) nên đã phóng đại lỗi. Đo lại bằng giả lập thiết bị chuẩn: header/avatar/chuông **không** tràn ở 390px; tràn thật nằm **bên trong `.page-content`** (filter bar Board, pill tabs MyTasks, input Setting, Chart, List) | Phase B (shell) + Phase C/F (nội dung từng trang) |
+| KI-12 | `.avatar-xs` hiển thị 32px và `.checklist-add-btn` bị `.btn` đè, do họ `.btn*`/`.avatar*` trong project.css | Phase D/F/H (thay đổi hiển thị có chủ đích) |
+| KI-13 | Lỗi console `Invalid DOM property class` (JSX dùng `class=`) ở MainLayout/Dashboard | Phase B (MainLayout), Dashboard ở Phase G |
 | KI-11 | `api.jsx` nằm ngoài `src/` | Ghi nhận, không di chuyển |
 
 ---
