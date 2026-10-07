@@ -7,9 +7,9 @@
 | Mục | Giá trị |
 |---|---|
 | Cập nhật lần cuối | 2026-10-07 |
-| Trạng thái hiện tại | **Phase A–F COMPLETED** (Phase F: 2026-10-07). Phase E/F chạy **backend thật** (bản sao local, DB QA riêng) — xem *Phase E › Backend Integration* |
-| Code đã sửa | Có — xem **Changed Files**. Git: baseline `a9ef6f4`, Phase A `4908de3`, Phase B `88caebf`, Phase C `a5701fe`, Phase D `1ace444`, Phase E `c2af4e2`, Phase F `67844d1` |
-| Phase triển khai kế tiếp | Phase G — Dashboard (**chờ user cho phép**, xem *Phase F › Next Phase*) |
+| Trạng thái hiện tại | **Phase A–F + FINAL UI/UX COMPLETION (2026-10-07)** — **READY FOR HANDOVER WITH KNOWN ISSUES**. Phase E/F/Final chạy **backend thật** (bản sao local, DB QA riêng) — xem *Phase E › Backend Integration* |
+| Code đã sửa | Có — xem **Changed Files**. Git: baseline `a9ef6f4`, Phase A `4908de3`, Phase B `88caebf`, Phase C `a5701fe`, Phase D `1ace444`, Phase E `c2af4e2`, Phase F `67844d1`, Final `223ae8a` |
+| Phase triển khai kế tiếp | **Không còn** — Final pass thay thế Phase G–J; dự án ở trạng thái bàn giao |
 
 ---
 
@@ -483,10 +483,8 @@ Một hệ breakpoint duy nhất (giữ theo `responsive.css`): **sm 640 · md 7
 | D | Task Card | ✅ COMPLETED (2026-10-07) — phần cần dữ liệu thật: BLOCKED |
 | E | Task Drawer + Real Backend Integration | ✅ COMPLETED (2026-10-07) — live backend QA 52/52 |
 | F | My Tasks + Projects + Modal hardening | ✅ COMPLETED (2026-10-07) — live backend QA 56/56; một số nhánh BLOCKED theo phạm vi |
-| G | Dashboard | ⬜ |
-| H | Forms / Modal / Auth / Settings | ⬜ |
-| I | Responsive pass | ⬜ |
-| J | Accessibility pass | ⬜ |
+| G–J | Dashboard / Forms-Modal / Responsive / Accessibility | ➖ Gộp vào **FINAL UI/UX COMPLETION** (user quyết định không chia tiếp phase) |
+| FINAL | Final UI/UX completion — handover | ✅ COMPLETED (2026-10-07) — live QA 44/44 mới + 56/56 hồi quy Phase F; 65/65 route×viewport |
 | K | Micro-interaction (+ dark mode tuỳ chọn) | ⬜ |
 | L | Final Visual QA | ⬜ |
 
@@ -1300,6 +1298,102 @@ My Tasks (api.jsx, 4 trạng thái, Retry thật, search icon, inline style, mob
 
 ---
 
+# FINAL UI/UX COMPLETION — 2026-10-07
+
+> Code commit `223ae8a` (`feat(ui): complete final ui ux handover`). Pass cuối thay cho Phase G/H/I/J. Không sửa backend, không thêm business feature, không mock. Kiểm bằng backend QA local (như Phase E/F).
+
+## Completed
+
+**Dashboard (Phương án A — widget không có dữ liệu thật thì ẩn hẳn)**
+- `Dasboard.jsx` chỉ render widget có API thật: **KPI**. 6 widget mock (TodayTask, UCMDeadlines, RecentActivity, TaskCompletion, TeamWorkload, ProjectStatus) **không import/không render** (file giữ nguyên trong repo — KI-06); 2 lưới `.grid-3` rỗng bị bỏ → layout tự co.
+- KPI: `fetchPortfolio()` trong `api.jsx` (endpoint **có sẵn** `GET /project/portfolio`, cùng header). Loading (`role="status"`), Error (`ErrorState` + Retry gọi lại request thật), Success. Không có số nào khi lỗi.
+- Chỉ hiển thị **Total Projects**. Ẩn **Total Budget** (schema có `budget` mặc định 0 nhưng không màn hình/API nào ghi → luôn `$0`) và **On-Time Rate** (backend đếm `status === 'done'` nhưng chỉ ghi `pending`/`completed` → luôn 0%, hoặc 100% khi chưa có task) — xem KI-43. Icon lucide thay SVG nhúng; 0 inline style; một lớp padding.
+
+**Modal dùng chung cho form** (`src/components/common/Modal.jsx`) — 6 modal form trước đây tự dựng (không `role`, không Esc/focus trap, nút ✕ không nhãn, label không gắn input):
+- Board "Add Task", Backlog "Add Task to Backlog", Projects "Create task" + "Create project", Settings "Invite a member", Calendar "Add note".
+- `role="dialog"`, `aria-modal`, `aria-labelledby`/`describedby`, nút đóng `aria-label`, Esc / bấm nền đóng, focus vào field đầu, Tab giữ trong modal, trả focus, khoá cuộn; phím ở window capture (như ConfirmDialog). Toàn bộ label `htmlFor` ↔ `id` (22 field); swatch màu có `aria-label` + `aria-pressed`. Form, state, handler, payload **không đổi**.
+- Bỏ inline style trình bày của các modal (Board modal 11 → 0). Mobile: padding gọn, `grid-2` thành 1 cột.
+
+**Thông báo thống nhất**
+- Projects: `showToast` lưu vào state **nhưng chưa từng render** (mọi lỗi kiểm tra ngày / "Project created" vô hình) → chuyển sang `notify()`; bỏ toast trùng khi danh sách lỗi (đã có ErrorState).
+- AdminUsers: toast tự dựng → `notify()`; đổi trạng thái tài khoản lỗi trước đây chỉ `console` → nay báo lỗi.
+- Xác minh lại: **0** `alert(` / `window.alert(` / `confirm(` / `window.confirm(` trong `src/` + `api.jsx`.
+
+**Calendar**
+- KI-37 sửa thuần CSS: lưới 7 cột `minmax(0, 1fr)`, ô gọn trên điện thoại → cột CN và nút "+" nằm trong card ở 390/375. Logic tính lịch không đổi.
+- Khung lịch / toolbar / ô ngày chuyển từ inline style sang class token; nút tháng trước/sau có `aria-label`; nút "+" có `aria-label` theo ngày; ngày hôm nay `aria-current="date"`.
+- Ô ngày không còn con trỏ "bấm được" vì bấm vào không mở gì (KI-44).
+
+**Tràn ngang còn lại từ Phase E — đã hết**
+- Backlog: bảng cuộn **trong card** (`.backlog-table-wrap`), không làm rộng trang.
+- Settings › General: lưới Color/Start/End 1 cột trên điện thoại; 5 label gắn với input.
+- Chart: lưới biểu đồ `minmax(min(100%, 420px), 1fr)`.
+
+**Khác**: `class=` → `className` (71 chỗ, trong các file widget không render + `FilterBar.jsx` không dùng) → 0; `aria-label` cho ô tìm/lọc AdminUsers và input file Overview. My Tasks, Projects (KI-17), Board, Task Drawer, ConfirmDialog: **không sửa**, chỉ hồi quy.
+
+## Changed Files
+
+| File | Loại | Ghi chú |
+|---|---|---|
+| `src/components/common/Modal.jsx` | Mới | Khung modal form dùng chung |
+| `api.jsx` | Sửa | `fetchPortfolio` |
+| `src/pages/Dashboard/Dasboard.jsx`, `KPI/KPI.jsx` | Sửa | Chỉ widget thật; KPI qua api.jsx, ẩn số placeholder |
+| `src/pages/Dashboard/{OverViews,ProjectProgress}/*.jsx`, `src/pages/MyTasks/FilterBar/FilterBar.jsx` | Sửa | `class=` → `className` (không render) |
+| `src/pages/Project/{Project,ProjectBoard,ProjectList,ProjectSetting,ProjectCalendar}.jsx` | Sửa | Dùng `Modal`, label/id, bỏ inline style modal; Calendar grid; Settings grid; Backlog table |
+| `src/pages/Project/ProjectChart.jsx`, `ProjectOverview.jsx` | Sửa | Lưới chart co giãn; nhãn input file |
+| `src/pages/AdminUsers/AdminUsers.jsx` | Sửa | `notify()`, nhãn ô tìm/lọc |
+| `src/assets/style/components.css`, `responsive.css` | Sửa | `.form-modal*`, `.color-swatch`, `.calendar-*`, `.backlog-table*`, `.settings-field-grid`, Dashboard |
+
+## Verification
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `npm run build` | ✅ JS 949.67 KB (gzip 276.38), CSS 86.84 KB (gzip 15.07); cảnh báo chunk > 500 KB có sẵn (KI-05) |
+| `npm run lint` | ✅ **0 error**, **47 warning** (sau Phase F: 55) — so theo file + rule: **không có cảnh báo mới** |
+| Live QA Final (`liveFinal.mjs`, backend thật) | ✅ **44/44** — KPI qua api.jsx (200, Authorization), giá trị = API, ẩn Budget/On-Time/mock, loading, lỗi → ErrorState không có "0", Retry; 4 modal form (Board, Backlog, Invite, Add note): dialog semantics, focus field đầu, label gắn, mọi control có tên, Tab trap, vừa 390/375, Esc + trả focus + mở khoá cuộn, bấm nền, không submit; Column khoá khi mở từ cột (giữ hành vi); Settings General có label; Drawer & Header popover mọi control có tên; Calendar 390/375 vừa 7 cột; 0 native dialog, 0 lỗi console |
+| Hồi quy Phase F (`liveF.mjs` + `liveF2.mjs`) | ✅ **50/50 + 6/6** — My Tasks, Projects KI-17, ConfirmDialog trên drawer (Esc không xuyên xuống drawer), checklist delete thật, toast, 403 suspended |
+| 13 route × 5 viewport (CDP, đăng nhập, dữ liệu thật) + mobile nav | ✅ **65/65 sạch** — không tràn ngang document/`.page-content`, không phần tử ngoài viewport; drawer mobile mở/đóng/Esc/khoá cuộn OK (trước pass: 6 cờ ở List/Setting/Chart/Calendar) |
+| Login / Register / Forgot | ✅ page dump so với Phase F: **0 khác biệt** (690 phần tử × 5 viewport) |
+| Quét accessible name (10 route đăng nhập + 4 route auth, 1280 & 390) | ✅ 0 control thiếu tên sau sửa (trước: 3) |
+| Tìm kiếm cuối | `alert/confirm`: **0** · `localhost`: chỉ `src/config/apiConfig.js` (fallback mặc định) · `class=` trong JSX: **0** · inline style: 295 → 236 (phần còn lại chủ yếu là giá trị động hoặc trang không thuộc phạm vi rủi ro thấp — KI-34) |
+
+### PASS
+Dashboard/KPI (thật, loading, error, retry, ẩn placeholder) · 6 modal form dùng chung (4 kiểm live; 2 của Projects kiểm qua build + cùng component) · ConfirmDialog/Toast (hồi quy) · My Tasks · Projects KI-17 · Board + Task Drawer (hồi quy Phase E/F) · Calendar KI-37 · tràn ngang List/Setting/Chart · a11y tên control · Auth pages không đổi · build/lint.
+
+### BLOCKED
+- **Projects › "Create project"**: chỉ Admin; tài khoản QA không phải Admin → chưa mở live (cùng `Modal` đã PASS ở 4 modal khác).
+- **Projects › "Create task"**: không có nút nào mở modal này trong UI hiện tại (KI-45) → không thể kiểm live.
+- **AdminUsers đổi trạng thái** (toast thành công/lỗi): cần quyền Admin.
+- Các nhánh xoá thành công / Upload / Notes / `user_banned`: như Phase F (ngoài phạm vi).
+
+## Remaining Known Issues
+
+- **Đã đóng trong pass này**: KI-08 ✅ (widget mock ẩn), KI-13 ✅ (`class=` = 0), KI-37 ✅ (Calendar ≤390px), KI-41 ✅ (toast cục bộ → `notify`), KI-10 ✅ (tràn trong `.page-content` ở List/Setting/Chart/MyTasks đã hết).
+- **KI-20 ◐**: một lớp padding ở Board, My Tasks, Projects, Dashboard; AdminUsers và các trang Project khác vẫn padding theo cấu trúc cũ (không tràn, chỉ khác khoảng cách).
+- **KI-34 ◐**: còn 236 inline style (Setting, Calendar chip, List, Login, Chart, Overview…) — phần lớn là màu/kích thước theo dữ liệu hoặc trang auth không được đổi giao diện; không refactor chỉ để đạt 0.
+- **KI-35 ◐**: Header, Nav, AdminUsers, đọc currentUser ở trang Project vẫn `fetch` trực tiếp (Header/Nav giữ theo DEC-045).
+- **KI-36** (backend): Task không có `date`/`dueDate` → Calendar không hiển thị task.
+- **KI-38 / KI-39**: giữ nguyên theo DEC-045 (refetch theo event; quy tắc đếm badge/chuông khác nhau).
+- **KI-40**: xoá checklist ở drawer My Tasks không có bước xác nhận (giữ hành vi).
+- **KI-42**: `deleteMemberByProject(member._id)` một tham số (giống KI-29), chưa kiểm nhánh thành công.
+- **KI-43 (mới, backend)**: `GET /project/portfolio` — `totalBudget` luôn 0 (không nơi nào ghi `budget`), `onTimeRate` dựa trên `status === 'done'` mà backend không ghi; ngoài ra `totalProjects` đếm **mọi** project trong DB, không theo người dùng. Frontend chỉ hiện Total Projects.
+- **KI-44 (mới, có sẵn)**: bấm ô ngày ở Calendar đặt `activeModal='quickCreateTaskModal'` nhưng Calendar không có modal đó → không có gì xảy ra (đã bỏ con trỏ gây hiểu nhầm, giữ logic).
+- **KI-45 (mới, có sẵn)**: modal "Create task" ở trang Projects không có nút mở trong UI.
+- Backend Issues #1–#4 (Phase E), KI-28/KI-29/KI-30/KI-31/KI-32/KI-33, KI-04/05/06/11/16/19/22/24/25/27: không đổi.
+
+## Decisions
+
+- **DEC-053**: Dashboard theo Phương án A: chỉ render widget có endpoint thật; số liệu mà backend không thể có giá trị thật (Budget, On-Time Rate) cũng bị ẩn dù endpoint trả về.
+- **DEC-054**: Một khung `Modal` dùng chung cho mọi modal form; `ConfirmDialog` vẫn là modal duy nhất cho xác nhận phá huỷ (hai vai trò khác nhau, cùng hành vi bàn phím/focus).
+- **DEC-055**: Bảng rộng (Backlog) cuộn ngang trong card của nó trên điện thoại; Board vẫn cuộn ngang theo thiết kế.
+- **DEC-056**: Tương tác không có kết quả (ô Calendar) không được hiển thị như bấm được; logic gốc giữ nguyên và ghi Known Issue.
+
+## Handover Status
+
+**READY FOR HANDOVER WITH KNOWN ISSUES** — giao diện nhất quán, responsive 5 viewport, trạng thái dữ liệu thật (không mock, không số 0 giả), không còn dialog trình duyệt, modal/toast chuẩn, đã hồi quy với backend thật. Các vấn đề còn lại phụ thuộc backend hoặc nằm ngoài phạm vi UI (xem trên). Không có phase tiếp theo.
+
+---
+
 ## Decisions
 
 ### Đã chốt (đề xuất mặc định — user có thể bác bỏ khi duyệt)
@@ -1331,6 +1425,7 @@ My Tasks (api.jsx, 4 trạng thái, Retry thật, search icon, inline style, mob
 - **DEC-024 (xác nhận), DEC-028 … DEC-034 (Phase D)**: xem mục *Phase D — COMPLETED › Decisions*.
 - **DEC-035 … DEC-044 (Phase E)**: xem mục *Phase E — COMPLETED › Decisions*.
 - **DEC-045 … DEC-052 (Phase F)**: xem mục *Phase F — COMPLETED › Decisions*.
+- **DEC-053 … DEC-056 (Final)**: xem mục *FINAL UI/UX COMPLETION › Decisions*.
 - **DEC-021 (Phase B)**: Menu tài khoản/ lời chào chỉ dùng dữ liệu có thật trong `localStorage.user`; thiếu thì hiển thị trung tính, không dùng tên/email/role giữ chỗ.
 
 ### Chờ user quyết định
@@ -1376,6 +1471,7 @@ My Tasks (api.jsx, 4 trạng thái, Retry thật, search icon, inline style, mob
 | D | `src/assets/style/{components,style}.css`, `src/pages/Project/project.css` | Sửa | CSS card, tooltip, avatar tone, KI-12; gỡ rule card cũ |
 | E | xem *Phase E — COMPLETED › Changed Files* | Mới/Sửa | Task Drawer dùng chung, apiConfig/env, avatar util, realtime drawer, URL tập trung |
 | F | xem *Phase F — COMPLETED › Changed Files* | Mới/Sửa | ConfirmDialog + Notifier dùng chung, 24 alert/confirm, My Tasks, Projects KI-17 |
+| Final | xem *FINAL UI/UX COMPLETION › Changed Files* | Mới/Sửa | Dashboard thật, Modal form dùng chung, Calendar/List/Setting/Chart responsive, a11y |
 
 ---
 
@@ -1411,24 +1507,25 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 | KI-05 | Bundle 948 KB, không code-split | Phase L nếu được đồng ý |
 | KI-06 | `main.js`, `src/App.css`, `src/index.css`, `src/assets/style/main.css` là legacy/template không dùng hoặc gần như không dùng | Ghi nhận, không tự xoá |
 | KI-07 | Board chưa có sort/group (Linear có) | Ngoài phạm vi (không thêm tính năng) |
-| KI-08 | Widget dashboard (TodayTask, UCMDeadlines, RecentActivity, TaskCompletion, TeamWorkload, ProjectStatus) chứa dữ liệu mock tĩnh, hiện không được render | Xử lý ở Phase G theo DEC-010 |
+| KI-08 | ~~Widget dashboard mock~~ | ✅ Final: không import/không render (DEC-053) |
 | KI-09 | 65 lint warning có sẵn (set-state-in-effect, exhaustive-deps…) | Không sửa trừ khi chạm đúng dòng đó |
-| KI-10 | **Đính chính (Phase A)**: ảnh Phase 0 chụp bằng `--window-size` của Edge headless (có bề rộng cửa sổ tối thiểu ~500px) nên đã phóng đại lỗi. Đo lại bằng giả lập thiết bị chuẩn: header/avatar/chuông **không** tràn ở 390px; tràn thật nằm **bên trong `.page-content`** (filter bar Board, pill tabs MyTasks, input Setting, Chart, List) | Phase B (shell) + Phase C/F (nội dung từng trang) |
+| KI-10 | **Đính chính (Phase A)**: ảnh Phase 0 chụp bằng `--window-size` của Edge headless (có bề rộng cửa sổ tối thiểu ~500px) nên đã phóng đại lỗi. Đo lại bằng giả lập thiết bị chuẩn: header/avatar/chuông **không** tràn ở 390px; tràn thật nằm **bên trong `.page-content`** (filter bar Board, pill tabs MyTasks, input Setting, Chart, List) | ✅ Hết ở Final (65/65 route×viewport sạch) |
 | KI-12 | ~~`.avatar-xs` hiển thị 32px~~ ✅ đã sửa ở Phase D. Phần còn lại: `.checklist-add-btn` bị `.btn` đè (họ `.btn*` trong project.css) | `.avatar-xs` ✅; `.checklist-add-btn` → Phase E/H |
-| KI-13 | ~~Lỗi console `Invalid DOM property class`~~ | ✅ Đã sửa ở Phase B (MainLayout, Dashboard). Các widget dashboard không render (TodayTask…) vẫn dùng `class=` → Phase G |
+| KI-13 | ~~Lỗi console `Invalid DOM property class`~~ | ✅ Đã sửa ở Phase B (MainLayout, Dashboard). Các widget dashboard không render (TodayTask…) vẫn dùng `class=` → ✅ Final: 0 `class=` trong JSX |
 | KI-14 | **BLOCKED**: QA Board với dữ liệu thật (kéo thả, task card, drawer, modal tạo task, realtime socket) và nhánh "thành công" của mọi trang trong shell mới | Chờ backend (DEC-P06) |
 | KI-15 | ~~Filter bar của Board có width cố định inline~~ | ✅ Đã sửa ở Phase C (BoardToolbar responsive) |
 | KI-16 | Tên workspace "Nang Cao Team" trong sidebar là chữ tĩnh (không có API workspace) | Ghi nhận; cần nguồn dữ liệu nếu muốn động |
 | KI-17 | ~~Trang Projects: số task từng project lỗi vẫn hiện 0~~ | ✅ Phase F: "—" + Retry, 0 chỉ khi rỗng thật (DEC-050) |
 | KI-18 | ~~MyTasks chưa có Retry, ô search chưa có icon~~ | ✅ Phase F |
 | KI-19 | Nội dung trang Project vẫn thụt lề theo cấu trúc cũ (16 khoảng trắng) sau khi bỏ wrapper — giữ nguyên để diff nhỏ | Ghi nhận (chỉ định dạng) |
-| KI-20 | `.page-content` + `.page-content-inner` / padding inline → padding kép trên một số trang | ◐ Board (Phase C), My Tasks + Projects (Phase F) đã xử lý; Dashboard/Admin… → Phase G/H |
+| KI-20 | `.page-content` + `.page-content-inner` / padding inline → padding kép trên một số trang | ◐ Board, My Tasks, Projects, Dashboard đã xử lý; AdminUsers/trang Project khác giữ (không tràn) |
 | KI-21 | Board chưa có Sort / Assignee / Priority filter (tính năng mới) | **Future Enhancement** — user giữ phạm vi Search + Week (DEC-024 xác nhận) |
 | KI-22 | Icon trạng thái cột suy từ tên cột; tên lạ → icon trung tính | Ghi nhận; nên map theo trường trạng thái nếu backend có |
 | KI-23 | ~~Nội dung task card còn inline style~~ | ✅ Đã sửa ở Phase D (TaskCard 0 inline style trình bày) |
 | KI-25 | Chữ viết tắt 2 ký tự trong avatar 20px khá dày khi chồng nhau | Chấp nhận; tuỳ chọn 1 ký tự nếu user muốn |
 | KI-26 | ~~Màu avatar chưa đồng bộ~~ | ✅ Đã sửa ở Phase E (`src/utils/avatar.js`, seed = user id) |
 | KI-28…KI-35 | Phát hiện ở Phase E (backend register/checklist delete, kéo bàn phím cột khuất, socket reconnect, Task.status, task_reviewed, inline style còn lại, fetch trực tiếp) | Xem *Phase E — COMPLETED › Known Issues*; KI-34/KI-35 ◐ sau Phase F |
+| KI-43…KI-45 | Phát hiện ở Final (portfolio backend, ô Calendar không mở gì, modal Create task không có nút mở) | Xem *FINAL UI/UX COMPLETION › Remaining Known Issues* |
 | KI-36…KI-42 | Phát hiện ở Phase F (Calendar không có ngày task từ backend, Calendar cắt cột ≤390px, Header/Nav refetch theo event, quy tắc đếm badge/chuông khác nhau, xoá checklist My Tasks không xác nhận, toast cục bộ còn lại, tham số xoá thành viên) | Xem *Phase F — COMPLETED › Known Issues* |
 | KI-27 | Card `role="button"` (dnd) chứa nút Not accept lồng bên trong | Giữ để không phá drag handle toàn card |
 | KI-24 | Tên project dài làm meta header xuống dòng ở tablet (header ~155px) | Chấp nhận (không cắt tên quá sớm) |
@@ -1438,7 +1535,7 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 
 ## Next Phase
 
-**Phase G — Dashboard** — chỉ bắt đầu khi user cho phép. Chi tiết đề xuất: xem *Phase F — COMPLETED › Next Phase*.
+**Không còn phase tiếp theo.** Dự án ở trạng thái **READY FOR HANDOVER WITH KNOWN ISSUES** — xem *FINAL UI/UX COMPLETION*.
 
 <details><summary>Đề xuất Phase C trước đây (đã thực hiện)</summary>
 
