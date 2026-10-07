@@ -1,14 +1,7 @@
 import { CalendarDays, CircleAlert, Clock, Gauge, ListChecks, X } from "lucide-react";
+import { avatarToneClass } from "../../../utils/avatar.js";
 
 const MAX_AVATARS = 3;
-const AVATAR_TONES = 6;
-
-// Stable color per person (same user → same tone on every card)
-const toneFor = (id = "") => {
-    let h = 0;
-    for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-    return h % AVATAR_TONES;
-};
 
 // Only abnormal deadline states get a visual signal ("On Track" shows nothing — DEC-002)
 const DEADLINE_SIGNAL = {
@@ -120,7 +113,7 @@ function TaskCard({ task, dragRef, draggableProps, dragHandleProps, isDragging, 
                                 {shownAssignees.map((a) => (
                                     <span
                                         key={a.id}
-                                        className={`avatar avatar-xs avatar-tone-${toneFor(a.id)}`}
+                                        className={`avatar avatar-xs ${avatarToneClass(a.id)}`}
                                         title={a.name}
                                     >
                                         {a.initials}

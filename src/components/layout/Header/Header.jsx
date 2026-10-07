@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import DropdownHeader from "./DropdownHeader/DropdownHeader";
 import { Menu, Bell } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { API_BASE_URL } from "../../../config/apiConfig.js";
 
 // Helper calculate due date based on project start date and week
 const calculateDueDateByWeek = (startDateStr, weekNum = 1) => {
@@ -39,7 +40,7 @@ function Header({ onOpenSidebar, menuButtonRef, sidebarOpen = false }) {
         if (!token) return;
 
         try {
-            const res = await fetch("http://localhost:3000/api/task/my-task", {
+            const res = await fetch(`${API_BASE_URL}/task/my-task`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (!res.ok) return;
@@ -59,7 +60,7 @@ function Header({ onOpenSidebar, menuButtonRef, sidebarOpen = false }) {
             const projectMap = {};
             await Promise.all(uniqueProjIds.map(async (pId) => {
                 try {
-                    const resProj = await fetch(`http://localhost:3000/api/project/${pId}`, {
+                    const resProj = await fetch(`${API_BASE_URL}/project/${pId}`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     if (resProj.ok) {

@@ -23,6 +23,7 @@ import {
     createNote,
     deleteNote
 } from '../../../api.jsx';
+import { API_BASE_URL } from "../../config/apiConfig.js";
 
 import ProjectHeader from '../../components/project/ProjectHeader.jsx';
 
@@ -130,7 +131,7 @@ export default function ProjectCalendar() {
             const token = localStorage.getItem("token");
             if (!token) return;
 
-            const res = await fetch("http://localhost:3000/api/user/currentUser", {
+            const res = await fetch(`${API_BASE_URL}/user/currentUser`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const data = await res.json();

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { API_BASE_URL } from "../../../../config/apiConfig.js";
 
 function Nav() {
     const [currentUserRole, setCurrentUserRole] = useState("");
@@ -17,7 +18,7 @@ function Nav() {
         if (!token) return;
 
         try {
-            const res = await fetch("http://localhost:3000/api/task/my-task", {
+            const res = await fetch(`${API_BASE_URL}/task/my-task`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (!res.ok) return;
@@ -75,7 +76,7 @@ function Nav() {
         const token = localStorage.getItem("token");
         if (!token) return;
 
-        fetch("http://localhost:3000/api/user/currentUser", {
+        fetch(`${API_BASE_URL}/user/currentUser`, {
             headers: { Authorization: `Bearer ${token}` }
         })
             .then((res) => res.json())

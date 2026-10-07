@@ -10,9 +10,15 @@ import {
     addComment,
     fetchTaskActivities,
     fetchColumnsByProject,
-    fetchMembersByProject
+    fetchMembersByProject,
+    fetchProjectById
 } from "./../../../api.jsx";
+import { API_BASE_URL } from "../../config/apiConfig.js";
 import { Loader2 } from "lucide-react";
+import ErrorState from "../../components/common/ErrorState.jsx";
+import { failureMessage } from "../../utils/requestState.js";
+import TaskDrawerFrame from "../../components/task/TaskDrawerFrame.jsx";
+import { DrawerSection, ChecklistSection, CommentsSection, ActivitySection, AssigneePicker, UserAvatar } from "../../components/task/TaskDrawerSections.jsx";
 
 // --- HELPER FUNCTIONS ---
 const calculateDueDateByWeek = (startDateStr, weekNum = 1) => {
@@ -113,7 +119,7 @@ const getCurrentUserId = () => {
     }
 };
 
-// --- COMPONENT TASK DRAWER ---
+// --- COMPONENT TASK DRAWER (My Tasks) — data + permissions here, presentation in components/task/* ---
 function TaskDrawer({
                         taskId,
                         isDrawerOpen,
@@ -127,96 +133,112 @@ function TaskDrawer({
     const [projectMembers, setProjectMembers] = useState([]);
     const [currentUserRole, setCurrentUserRole] = useState("Member");
     const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState('');
+    const [reloadKey, setReloadKey] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState('');
 
-    const [checklistText, setChecklistText] = useState('');
     const [comments, setComments] = useState([]);
-    const [commentText, setCommentText] = useState('');
+    const [commentsError, setCommentsError] = useState('');
     const [activities, setActivities] = useState([]);
-    const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('');
+    const [activitiesError, setActivitiesError] = useState('');
 
     const currentUserId = getCurrentUserId();
 
+    const loadActivities = () => fetchTaskActivities(taskId)
+        .then((data) => { setActivities(Array.isArray(data) ? data : (data?.data || [])); setActivitiesError(''); })
+        .catch((err) => setActivitiesError(failureMessage({ error: err })));
+    const loadComments = () => fetchTaskComments(taskId)
+        .then((data) => { setComments(Array.isArray(data) ? data : (data?.data || [])); setCommentsError(''); })
+        .catch((err) => setCommentsError(failureMessage({ error: err })));
+
     useEffect(() => {
-        if (isDrawerOpen && taskId) {
-            setLoading(true);
-            setAssigneeSearchQuery('');
+        if (!isDrawerOpen || !taskId) return;
+        let cancelled = false;
+        setLoading(true);
+        setLoadError('');
+        setSaveError('');
 
-            fetchTaskById(taskId)
-                .then(async (taskData) => {
-                    const realTask = taskData?.data || taskData;
-                    const formattedAssignees = Array.isArray(realTask.assignees)
-                        ? realTask.assignees.map(a => typeof a === 'object' ? String(a._id || a.id) : String(a))
-                        : [];
+        fetchTaskById(taskId)
+            .then(async (taskData) => {
+                const realTask = taskData?.data || taskData;
+                const formattedAssignees = Array.isArray(realTask.assignees)
+                    ? realTask.assignees.map(a => typeof a === 'object' ? String(a._id || a.id) : String(a))
+                    : [];
 
-                    const projId = typeof realTask.projectId === 'object'
-                        ? (realTask.projectId?._id || realTask.projectId?.id)
-                        : realTask.projectId;
+                const projId = typeof realTask.projectId === 'object'
+                    ? (realTask.projectId?._id || realTask.projectId?.id)
+                    : realTask.projectId;
 
-                    let pStartDate = typeof realTask.projectId === 'object' ? realTask.projectId?.startDate : null;
+                let pStartDate = typeof realTask.projectId === 'object' ? realTask.projectId?.startDate : null;
 
-                    if (projId && !pStartDate) {
-                        try {
-                            const token = localStorage.getItem("token");
-                            const resProj = await fetch(`http://localhost:3000/api/project/${projId}`, {
-                                headers: { Authorization: `Bearer ${token}` }
-                            });
-                            if (resProj.ok) {
-                                const pData = await resProj.json();
-                                const realProj = pData?.data || pData;
-                                pStartDate = realProj?.startDate;
-                            }
-                        } catch (e) {
-                            console.error("Không thể lấy startDate của Project:", e);
-                        }
+                if (projId && !pStartDate) {
+                    try {
+                        const pData = await fetchProjectById(projId);
+                        const realProj = pData?.data || pData;
+                        pStartDate = realProj?.startDate;
+                    } catch (e) {
+                        console.error("Không thể lấy startDate của Project:", e);
                     }
+                }
+                if (cancelled) return;
 
-                    setProjectStartDate(pStartDate);
-                    const calculatedDue = calculateDueDateByWeek(pStartDate, realTask.week ?? 1);
+                setProjectStartDate(pStartDate);
+                const calculatedDue = calculateDueDateByWeek(pStartDate, realTask.week ?? 1);
 
-                    setTask({
-                        ...realTask,
-                        title: realTask.title || realTask.name || '',
-                        columnId: extractColumnId(realTask.columnId),
-                        assignees: formattedAssignees,
-                        points: realTask.points ?? realTask.point ?? 0,
-                        week: realTask.week ?? 1,
-                        dueDate: realTask.dueDate || calculatedDue,
-                    });
+                setTask({
+                    ...realTask,
+                    title: realTask.title || realTask.name || '',
+                    columnId: extractColumnId(realTask.columnId),
+                    columnTitle: typeof realTask.columnId === 'object' ? (realTask.columnId?.title || realTask.columnId?.name) : '',
+                    assignees: formattedAssignees,
+                    points: realTask.points ?? realTask.point ?? 0,
+                    week: realTask.week ?? 1,
+                    dueDate: realTask.dueDate || calculatedDue,
+                });
 
-                    if (projId && typeof projId === 'string') {
-                        const [colsData, memsData] = await Promise.all([
-                            fetchColumnsByProject(projId).catch(() => []),
-                            fetchMembersByProject(projId).catch(() => [])
-                        ]);
-
-                        const realCols = Array.isArray(colsData) ? colsData : (colsData?.data || []);
-                        realCols.sort((a, b) => (a.position || 0) - (b.position || 0));
-                        setColumns(realCols);
-
-                        const realMems = Array.isArray(memsData) ? memsData : (memsData?.data || memsData?.members || []);
-                        setProjectMembers(realMems);
-
-                        const currentMember = realMems.find(m => {
-                            const uId = extractUserId(m);
-                            return String(uId) === String(currentUserId);
-                        });
-                        if (currentMember) {
-                            setCurrentUserRole(currentMember.role || "Member");
-                        }
-                    }
-
-                    const [commentsData, activitiesData] = await Promise.all([
-                        fetchTaskComments(taskId).catch(() => []),
-                        fetchTaskActivities(taskId).catch(() => [])
+                if (projId && typeof projId === 'string') {
+                    const [colsData, memsData] = await Promise.all([
+                        fetchColumnsByProject(projId).catch(() => []),
+                        fetchMembersByProject(projId).catch(() => [])
                     ]);
-                    setComments(Array.isArray(commentsData) ? commentsData : (commentsData?.data || []));
-                    setActivities(Array.isArray(activitiesData) ? activitiesData : (activitiesData?.data || []));
-                })
-                .catch((err) => console.error("Lỗi khi tải chi tiết task:", err))
-                .finally(() => setLoading(false));
-        }
-    }, [taskId, isDrawerOpen, currentUserId]);
+                    if (cancelled) return;
+
+                    const realCols = Array.isArray(colsData) ? colsData : (colsData?.data || []);
+                    realCols.sort((a, b) => (a.position || 0) - (b.position || 0));
+                    setColumns(realCols);
+
+                    const realMems = Array.isArray(memsData) ? memsData : (memsData?.data || memsData?.members || []);
+                    setProjectMembers(realMems);
+
+                    const currentMember = realMems.find(m => {
+                        const uId = extractUserId(m);
+                        return String(uId) === String(currentUserId);
+                    });
+                    if (currentMember) {
+                        setCurrentUserRole(currentMember.role || "Member");
+                    }
+                }
+
+                const [c, a] = await Promise.all([
+                    fetchTaskComments(taskId).then((d) => ({ ok: d }), (e) => ({ err: failureMessage({ error: e }) })),
+                    fetchTaskActivities(taskId).then((d) => ({ ok: d }), (e) => ({ err: failureMessage({ error: e }) }))
+                ]);
+                if (cancelled) return;
+                setComments(c.ok ? (Array.isArray(c.ok) ? c.ok : (c.ok?.data || [])) : []);
+                setCommentsError(c.err || '');
+                setActivities(a.ok ? (Array.isArray(a.ok) ? a.ok : (a.ok?.data || [])) : []);
+                setActivitiesError(a.err || '');
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                console.error("Lỗi khi tải chi tiết task:", err);
+                setTask(null);
+                setLoadError(failureMessage({ error: err }));
+            })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [taskId, isDrawerOpen, currentUserId, reloadKey]);
 
     const isOwnerOrManager = ["Owner", "Manager", "Admin", "Leader"].includes(currentUserRole);
     const isAssignee = task?.assignees?.some(a => {
@@ -228,18 +250,6 @@ function TaskDrawer({
     const canEditStatus = isOwnerOrManager || isAssignee;
     const canManageChecklist = isOwnerOrManager;
     const canDelete = isOwnerOrManager;
-
-    const filteredProjectMembers = useMemo(() => {
-        if (!assigneeSearchQuery.trim()) return projectMembers;
-        const query = assigneeSearchQuery.toLowerCase().trim();
-        return projectMembers.filter(member => {
-            const email = getMemberEmail(member).toLowerCase();
-            const name = getMemberDisplayName(member).toLowerCase();
-            return email.includes(query) || name.includes(query);
-        });
-    }, [projectMembers, assigneeSearchQuery]);
-
-    if (!isDrawerOpen) return null;
 
     const handleUpdateTaskField = async (updatedFields) => {
         if (!task || isSaving) return;
@@ -266,6 +276,7 @@ function TaskDrawer({
         const updatedTaskLocal = { ...task, ...updatedFields };
 
         setTask(updatedTaskLocal);
+        setSaveError('');
         if (onTaskUpdated) onTaskUpdated(updatedTaskLocal);
 
         try {
@@ -278,14 +289,19 @@ function TaskDrawer({
                     ...updatedTaskLocal,
                     ...returnedTask,
                     columnId: extractColumnId(returnedTask.columnId) || updatedTaskLocal.columnId,
+                    assignees: Array.isArray(returnedTask.assignees)
+                        ? returnedTask.assignees.map(a => typeof a === 'object' ? String(a._id || a.id) : String(a))
+                        : updatedTaskLocal.assignees,
                     points: returnedTask.points ?? returnedTask.point ?? updatedTaskLocal.points,
                 };
                 setTask(finalTask);
                 if (onTaskUpdated) onTaskUpdated(finalTask);
             }
+            loadActivities();
         } catch (error) {
             console.error("Lỗi khi cập nhật task:", error);
             setTask(previousTask);
+            setSaveError(`Couldn't save changes — ${error.message}`);
             if (onTaskUpdated) onTaskUpdated(previousTask);
         } finally {
             setIsSaving(false);
@@ -334,149 +350,133 @@ function TaskDrawer({
             handleCloseDrawer();
         } catch (error) {
             console.error("Lỗi khi xóa task:", error);
+            setSaveError(`Couldn't delete the task — ${error.message}`);
         }
     };
 
-    const handleAddChecklist = async () => {
-        if (!canManageChecklist || !checklistText.trim()) return;
-        const textToSend = checklistText.trim();
-        setChecklistText('');
-
-        try {
-            const response = await addChecklistItem(taskId, textToSend);
-            const realTask = response?.data || response;
-            if (realTask && realTask.checklist) {
-                setTask(prev => ({ ...prev, checklist: realTask.checklist }));
-                if (onTaskUpdated) onTaskUpdated({ ...task, checklist: realTask.checklist });
-            }
-        } catch (error) {
-            console.error("Lỗi khi thêm checklist:", error);
+    // Checklist / comment actions return promises: the shared sections show progress and errors
+    const handleAddChecklist = async (text) => {
+        if (!canManageChecklist || !text.trim()) return;
+        const response = await addChecklistItem(taskId, text.trim());
+        const realTask = response?.data || response;
+        if (realTask && realTask.checklist) {
+            setTask(prev => ({ ...prev, checklist: realTask.checklist }));
+            if (onTaskUpdated) onTaskUpdated({ ...task, checklist: realTask.checklist });
         }
+        loadActivities();
     };
 
-    const handleToggleChecklist = async (itemId, completed) => {
+    const handleToggleChecklist = async (item) => {
         if (!canEditStatus) return;
-
-        const updatedChecklist = (task.checklist || []).map(item =>
-            String(item._id) === String(itemId) ? { ...item, completed: !completed } : item
-        );
-        setTask(prev => ({ ...prev, checklist: updatedChecklist }));
-
+        const previousChecklist = task.checklist;
+        setTask(prev => ({
+            ...prev,
+            checklist: (prev.checklist || []).map(i => String(i._id) === String(item._id) ? { ...i, completed: !item.completed } : i)
+        }));
         try {
-            const response = await toggleChecklistItem(taskId, itemId, completed);
+            const response = await toggleChecklistItem(taskId, item._id, item.completed);
             const realTask = response?.data || response;
-
             if (realTask && realTask.checklist) {
                 setTask(prev => ({ ...prev, checklist: realTask.checklist }));
                 if (onTaskUpdated) onTaskUpdated({ ...task, checklist: realTask.checklist });
             }
+            loadActivities();
         } catch (error) {
             console.error("Lỗi khi cập nhật checklist:", error);
+            setTask(prev => ({ ...prev, checklist: previousChecklist }));
+            throw error;
         }
     };
 
-    const handleDeleteChecklist = async (checklistId) => {
+    const handleDeleteChecklist = async (item) => {
         if (!canManageChecklist) return;
 
         const previousChecklist = task.checklist;
-        const updatedChecklist = (task.checklist || []).filter(
-            item => String(item._id) !== String(checklistId)
-        );
-        setTask(prev => ({ ...prev, checklist: updatedChecklist }));
+        setTask(prev => ({ ...prev, checklist: (prev.checklist || []).filter(i => String(i._id) !== String(item._id)) }));
 
         try {
-            if (typeof deleteChecklist === 'function') {
-                await deleteChecklist(checklistId);
-            }
+            // see the BACKEND MISMATCH note on deleteChecklist in api.jsx — the item id is passed on purpose
+            await deleteChecklist(item._id);
         } catch (error) {
             console.error("Lỗi khi xóa checklist:", error);
             setTask(prev => ({ ...prev, checklist: previousChecklist }));
+            throw error;
         }
     };
 
-    const handleAddComment = async (e) => {
-        e.preventDefault();
-        if (!commentText.trim()) return;
-
-        const textToSend = commentText;
-        setCommentText('');
-
-        try {
-            const newComment = await addComment(taskId, textToSend);
-            setComments(prev => [...prev, newComment?.data || newComment]);
-        } catch (error) {
-            console.error("Lỗi khi gửi bình luận:", error);
-        }
+    const handleAddComment = async (text) => {
+        const newComment = await addComment(taskId, text);
+        const created = newComment?.data || newComment;
+        setComments(prev => prev.some(c => String(c._id) === String(created._id)) ? prev : [...prev, created]);
+        loadActivities();
     };
 
-    const renderPriorityBadge = (priority) => {
-        const priorityConfig = {
-            Low: { color: '#2563eb', bg: '#eff6ff' },
-            Medium: { color: '#d97706', bg: '#fffbeb' },
-            High: { color: '#dc2626', bg: '#fef2f2' },
-            Urgent: { color: '#7c3aed', bg: '#f5f3ff' }
-        };
-        const config = priorityConfig[priority] || priorityConfig.Medium;
-
-        return (
-            <span className="priority-badge" style={{ color: config.color, background: config.bg, padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
-                {priority}
-            </span>
-        );
-    };
-
-    const totalChecklist = task?.checklist?.length || 0;
-    const completedChecklist = task?.checklist?.filter(item => item.completed)?.length || 0;
-    const progressPercent = totalChecklist > 0 ? Math.round((completedChecklist / totalChecklist) * 100) : 0;
+    const column = columns.find(c => String(c._id) === String(task?.columnId));
+    const columnLabel = column ? (column.title || column.name) : task?.columnTitle;
+    const assigneeMembers = projectMembers.filter(m => (task?.assignees || []).includes(extractUserId(m)));
 
     return (
-        <div className={`drawer-overlay ${isDrawerOpen ? "" : "hidden"}`} id="taskDrawer">
-            <div className="drawer-panel">
-                <div className="drawer-header">
-                    <div className="drawer-header-meta" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {renderPriorityBadge(task?.priority || 'Medium')}
-                        <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                            {isSaving ? "Updating..." : `Role: ${currentUserRole}`}
-                        </span>
-                    </div>
-                    <button className="icon-btn" onClick={handleCloseDrawer} aria-label="Close panel" style={{ cursor: 'pointer' }}>
-                        ✕
-                    </button>
+        <TaskDrawerFrame
+            open={isDrawerOpen}
+            onClose={handleCloseDrawer}
+            labelledBy="task-drawer-title"
+            headerContent={
+                <>
+                    {task && <span className={`priority-tag priority-${(task.priority || 'Medium').toLowerCase()}`}>{task.priority || 'Medium'}</span>}
+                    <span className="drawer-save-state" role="status">
+                        {isSaving ? (
+                            <><Loader2 className="icon icon-sm animate-spin" aria-hidden="true" /> Saving…</>
+                        ) : task ? `Your role: ${currentUserRole}` : ''}
+                    </span>
+                </>
+            }
+        >
+            {loading ? (
+                <div className="drawer-body drawer-state" role="status">
+                    <Loader2 className="icon animate-spin" aria-hidden="true" />
+                    <span>Loading task…</span>
                 </div>
-
-                {loading || !task ? (
-                    <div className="drawer-body" style={{ padding: '48px 24px', textAlign: 'center', color: '#6b7280' }}>
-                        <Loader2 className="animate-spin" size={32} style={{ margin: '0 auto 12px' }} />
-                        <span>Loading...</span>
-                    </div>
-                ) : (
-                    <div className="drawer-body">
+            ) : loadError || !task ? (
+                <div className="drawer-body">
+                    <ErrorState
+                        title="Couldn't load this task"
+                        message={loadError || 'The task could not be loaded.'}
+                        onRetry={() => setReloadKey(k => k + 1)}
+                    />
+                </div>
+            ) : (
+                <div className="drawer-body">
+                    <div className="drawer-title-block">
                         <textarea
+                            id="task-drawer-title"
                             className="drawer-title-input"
-                            rows="1"
+                            rows="2"
+                            aria-label="Task title"
                             disabled={!canEditAll}
                             value={task.title || ''}
                             onChange={(e) => handleInputChange('title', e.target.value)}
                             onBlur={(e) => canEditAll && handleUpdateTaskField({ title: e.target.value })}
-                            placeholder="Nhập tiêu đề task..."
+                            placeholder="Task title"
                         />
+                        <div className="drawer-subline">
+                            {columnLabel && <span className="drawer-chip">{columnLabel}</span>}
+                            {task.dueDate && <span className="drawer-chip">Due {formatShortDate(task.dueDate)} · {getRemainingDaysLabel(projectStartDate, task.week)}</span>}
+                            {assigneeMembers.length > 0 && (
+                                <span className="avatar-group">
+                                    {assigneeMembers.map(m => (
+                                        <UserAvatar key={extractUserId(m)} userId={extractUserId(m)} name={getMemberDisplayName(m)} size="xs" />
+                                    ))}
+                                </span>
+                            )}
+                        </div>
+                    </div>
 
+                    {saveError && <div className="drawer-inline-error" role="alert">{saveError}</div>}
+
+                    <DrawerSection title="Properties">
                         <div className="drawer-field-grid">
-                            <div style={{ gridColumn: 'span 2' }}>
-                                <span className="drawer-field-label">Title</span>
-                                <input
-                                    className="input"
-                                    type="text"
-                                    disabled={!canEditAll}
-                                    value={task.title || ''}
-                                    onChange={(e) => handleInputChange('title', e.target.value)}
-                                    onBlur={(e) => canEditAll && handleUpdateTaskField({ title: e.target.value })}
-                                />
-                            </div>
-
-                            {/* Status */}
-                            <div>
-                                <span className="drawer-field-label">Status</span>
+                            <label className="drawer-field">
+                                <span className="drawer-field-label">Column</span>
                                 <select
                                     className="select"
                                     disabled={!canEditStatus}
@@ -485,20 +485,14 @@ function TaskDrawer({
                                 >
                                     {columns.length > 0 ? (
                                         columns.map((col) => (
-                                            <option key={col._id} value={String(col._id)}>
-                                                {col.name || col.title}
-                                            </option>
+                                            <option key={col._id} value={String(col._id)}>{col.name || col.title}</option>
                                         ))
                                     ) : (
-                                        <option value={extractColumnId(task.columnId)}>
-                                            {typeof task.columnId === 'object' ? (task.columnId?.name || task.columnId?.title) : 'Review'}
-                                        </option>
+                                        <option value={extractColumnId(task.columnId)}>{columnLabel || 'Backlog'}</option>
                                     )}
                                 </select>
-                            </div>
-
-                            {/* Priority */}
-                            <div>
+                            </label>
+                            <label className="drawer-field">
                                 <span className="drawer-field-label">Priority</span>
                                 <select
                                     className="select"
@@ -511,10 +505,8 @@ function TaskDrawer({
                                     <option value="High">High</option>
                                     <option value="Urgent">Urgent</option>
                                 </select>
-                            </div>
-
-                            {/* Points */}
-                            <div>
+                            </label>
+                            <label className="drawer-field">
                                 <span className="drawer-field-label">Points</span>
                                 <input
                                     className="input"
@@ -525,10 +517,8 @@ function TaskDrawer({
                                     onChange={(e) => handleInputChange('points', e.target.value)}
                                     onBlur={(e) => canEditAll && handleUpdateTaskField({ points: Number(e.target.value) || 0, point: Number(e.target.value) || 0 })}
                                 />
-                            </div>
-
-                            {/* Week */}
-                            <div>
+                            </label>
+                            <label className="drawer-field">
                                 <span className="drawer-field-label">Week</span>
                                 <input
                                     className="input"
@@ -539,188 +529,74 @@ function TaskDrawer({
                                     onChange={(e) => handleInputChange('week', e.target.value)}
                                     onBlur={(e) => canEditAll && handleUpdateTaskField({ week: Number(e.target.value) || 1 })}
                                 />
-                            </div>
-
-                            {/* Assignees */}
-                            <div style={{ gridColumn: 'span 2' }}>
+                            </label>
+                            <div className="drawer-field drawer-field--wide">
                                 <span className="drawer-field-label">
-                                    Assignees {task.assignees?.length > 0 && `(${task.assignees.length} selected)`}
+                                    Assignees{task.assignees?.length > 0 ? ` · ${task.assignees.length}` : ''}
                                 </span>
-
-                                {canEditAll && (
-                                    <input
-                                        className="input"
-                                        type="text"
-                                        placeholder="Search assignee by email..."
-                                        value={assigneeSearchQuery}
-                                        onChange={(e) => setAssigneeSearchQuery(e.target.value)}
-                                        style={{ marginBottom: '6px', fontSize: '13px' }}
-                                    />
-                                )}
-
-                                <div className="card" style={{ maxHeight: '140px', overflowY: 'auto', padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    {filteredProjectMembers.map((member, idx) => {
-                                        const memberUserId = extractUserId(member);
-                                        const memberRecordId = String(member._id || member.id || '');
-                                        const name = getMemberDisplayName(member);
-                                        const email = getMemberEmail(member);
-
-                                        const isChecked = task.assignees?.some(a => {
-                                            const id = typeof a === 'object' ? String(a._id || a.id) : String(a);
-                                            return id === String(memberUserId) || id === memberRecordId;
-                                        });
-
-                                        return (
-                                            <label key={memberRecordId || idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: canEditAll ? 'pointer' : 'default', fontSize: '13px' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    className="checkbox"
-                                                    disabled={!canEditAll}
-                                                    checked={!!isChecked}
-                                                    onChange={() => handleToggleAssignee(member)}
-                                                />
-                                                <span className="avatar avatar-xs" style={{ background: '#4f46e5', color: '#fff', fontSize: '10px', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    {getInitials(name)}
-                                                </span>
-                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                    <span>{name}</span>
-                                                    {email && <span style={{ fontSize: '11px', color: '#6b7280' }}>{email}</span>}
-                                                </div>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Description */}
-                        <div>
-                            <span className="drawer-field-label">Description</span>
-                            <textarea
-                                className="textarea"
-                                rows="3"
-                                disabled={!canEditAll}
-                                placeholder="Add a more detailed description…"
-                                value={task.description || ''}
-                                onChange={(e) => handleInputChange('description', e.target.value)}
-                                onBlur={(e) => canEditAll && handleUpdateTaskField({ description: e.target.value })}
-                            />
-                        </div>
-
-                        {/* Checklist Section */}
-                        <div className="drawer-section">
-                            <div className="checklist-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span className="comments-title">Checklist</span>
-                                <span className="checklist-count">{completedChecklist}/{totalChecklist}</span>
-                            </div>
-                            <div className="progress-bar" style={{ height: '6px', background: '#e2e8f0', borderRadius: '3px', margin: '8px 0 12px' }}>
-                                <span
-                                    className="progress-bar-fill tone-success"
-                                    style={{ display: 'block', height: '100%', background: '#22c55e', width: `${progressPercent}%` }}
-                                ></span>
-                            </div>
-                            <div className="checklist-items" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                {task.checklist?.map((item, index) => (
-                                    <div key={item._id || index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <label className="checklist-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: canEditStatus ? 'pointer' : 'default', flex: 1 }}>
-                                            <input
-                                                type="checkbox"
-                                                className="checkbox"
-                                                disabled={!canEditStatus}
-                                                checked={item.completed || false}
-                                                onChange={() => handleToggleChecklist(item._id, item.completed)}
-                                            />
-                                            <span style={{ textDecoration: item.completed ? 'line-through' : 'none', color: item.completed ? '#9ca3af' : 'inherit' }}>
-                                                {item.text || item.title}
-                                            </span>
-                                        </label>
-
-                                        {canManageChecklist && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleDeleteChecklist(item._id)}
-                                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px 6px' }}
-                                            >
-                                                ✕
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-
-                            {canManageChecklist && (
-                                <div className="checklist-add-row" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                                    <input
-                                        className="input"
-                                        placeholder="Add checklist item…"
-                                        value={checklistText}
-                                        onChange={(e) => setChecklistText(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleAddChecklist()}
-                                    />
-                                    <button className="checklist-add-btn btn btn-secondary" onClick={handleAddChecklist}>+</button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Comments Section */}
-                        <div className="drawer-section">
-                            <p className="comments-title" style={{ fontWeight: 600, marginBottom: '8px' }}>Comments</p>
-                            <div className="comments-list" style={{ marginBottom: '12px' }}>
-                                {comments.length === 0 ? (
-                                    <p className="empty-state-desc">No comments yet</p>
-                                ) : (
-                                    comments.map((comment, idx) => (
-                                        <div key={comment._id || idx} style={{ marginBottom: '8px', fontSize: '14px' }}>
-                                            <strong>{comment.user?.username || comment.user?.name || 'User'}: </strong>
-                                            <span>{comment.text}</span>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                            <form onSubmit={handleAddComment}>
-                                <textarea
-                                    className="textarea"
-                                    rows="2"
-                                    placeholder="Write a comment…"
-                                    value={commentText}
-                                    onChange={(e) => setCommentText(e.target.value)}
+                                <AssigneePicker
+                                    members={projectMembers}
+                                    selectedIds={task.assignees || []}
+                                    canEdit={canEditAll}
+                                    onToggle={handleToggleAssignee}
+                                    getUserId={extractUserId}
+                                    getName={getMemberDisplayName}
+                                    getEmail={getMemberEmail}
                                 />
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                                    <button type="submit" className="btn btn-primary btn-sm">Send</button>
-                                </div>
-                            </form>
-                        </div>
-
-                        {/* Activities Section */}
-                        <div className="drawer-section">
-                            <p className="comments-title" style={{ fontWeight: 600, marginBottom: '8px' }}>Activities</p>
-                            <ol className="timeline" style={{ paddingLeft: '16px', fontSize: '13px', color: '#4b5563' }}>
-                                {activities.map((act, index) => (
-                                    <li key={act._id || index} className="timeline-item" style={{ marginBottom: '6px' }}>
-                                        <strong>{act.user?.username || act.user?.name || 'User'}</strong> {act.action || 'đã thao tác'}
-                                    </li>
-                                ))}
-                            </ol>
-                        </div>
-
-                        {/* Delete Task Section */}
-                        {canDelete && (
-                            <div className="drawer-section" style={{ marginTop: '24px' }}>
-                                <button
-                                    className="btn btn-outline btn-full"
-                                    style={{ color: '#dc2626', borderColor: '#fca5a5', width: '100%' }}
-                                    onClick={handleDeleteTask}
-                                >
-                                    Delete task
-                                </button>
                             </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
+                        </div>
+                    </DrawerSection>
+
+                    <DrawerSection title="Description">
+                        <textarea
+                            className="textarea"
+                            rows="4"
+                            aria-label="Description"
+                            disabled={!canEditAll}
+                            placeholder={canEditAll ? 'Add a more detailed description…' : 'No description.'}
+                            value={task.description || ''}
+                            onChange={(e) => handleInputChange('description', e.target.value)}
+                            onBlur={(e) => canEditAll && handleUpdateTaskField({ description: e.target.value })}
+                        />
+                    </DrawerSection>
+
+                    <ChecklistSection
+                        items={task.checklist || []}
+                        canToggle={canEditStatus}
+                        canAdd={canManageChecklist}
+                        canDelete={canManageChecklist}
+                        onToggle={handleToggleChecklist}
+                        onAdd={handleAddChecklist}
+                        onDelete={handleDeleteChecklist}
+                    />
+
+                    <CommentsSection
+                        comments={comments}
+                        loadError={commentsError}
+                        onRetry={loadComments}
+                        onSubmit={handleAddComment}
+                    />
+
+                    <ActivitySection activities={activities} loadError={activitiesError} onRetry={loadActivities} />
+
+                    {canDelete && (
+                        <div className="drawer-danger">
+                            <button type="button" className="btn btn-outline btn-sm drawer-delete-task" onClick={handleDeleteTask}>
+                                Delete task
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </TaskDrawerFrame>
     );
 }
+
+const formatShortDate = (value) => {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
 
 // --- MAIN MY TASKS COMPONENT ---
 function MyTasks() {
@@ -790,7 +666,7 @@ function MyTasks() {
             setError("");
 
             const token = localStorage.getItem("token");
-            const res = await fetch("http://localhost:3000/api/task/my-task", {
+            const res = await fetch(`${API_BASE_URL}/task/my-task`, {
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
@@ -813,7 +689,7 @@ function MyTasks() {
 
             const projFetchPromises = uniqueProjIds.map(async (pId) => {
                 try {
-                    const resProj = await fetch(`http://localhost:3000/api/project/${pId}`, {
+                    const resProj = await fetch(`${API_BASE_URL}/project/${pId}`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     if (resProj.ok) {

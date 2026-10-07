@@ -24,6 +24,7 @@ import {
     inviteMember,
     deleteMemberByProject
 } from '../../../api';
+import { API_BASE_URL } from "../../config/apiConfig.js";
 
 import ProjectHeader from '../../components/project/ProjectHeader.jsx';
 
@@ -148,7 +149,7 @@ export default function ProjectSetting() {
             const token = localStorage.getItem("token");
             if (!token) return;
 
-            const res = await fetch("http://localhost:3000/api/user/currentUser", {
+            const res = await fetch(`${API_BASE_URL}/user/currentUser`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const data = await res.json();
@@ -264,7 +265,7 @@ export default function ProjectSetting() {
         }
         try {
             const token = localStorage.getItem("token");
-            const res = await fetch(`http://localhost:3000/api/member/${memberId}`, {
+            const res = await fetch(`${API_BASE_URL}/member/${memberId}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",

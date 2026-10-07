@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import ErrorState from '../../../components/common/ErrorState.jsx';
 import { failureMessage } from '../../../utils/requestState.js';
+import { API_BASE_URL } from "../../../config/apiConfig.js";
 
 function KPI() {
     // 1. Khởi tạo State lưu đúng cấu trúc Object mà API trả về
@@ -19,7 +20,7 @@ function KPI() {
     useEffect(() => {
         const token = localStorage.getItem('token'); 
 
-        fetch('http://localhost:3000/api/project/portfolio', { 
+        fetch(`${API_BASE_URL}/project/portfolio`, { 
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3000/api'; // Thay bằng URL API của bạn
+import { API_BASE_URL, getApiErrorMessage } from './src/config/apiConfig.js';
 
 // Hàm xử lý Response chung
 const handleResponse = async (res) => {
@@ -23,7 +23,9 @@ const handleResponse = async (res) => {
             window.location.href = '/login';
         }
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `Lỗi ${res.status}: Không thể thực hiện yêu cầu`);
+        const error = new Error(getApiErrorMessage(errorData, res.status));
+        error.status = res.status;
+        throw error;
     }
 
     return res.json();
@@ -222,6 +224,10 @@ export const toggleChecklistItem = async (taskId, itemId, completed) => {
     return handleResponse(res);
 };
 
+// ⚠ BACKEND MISMATCH (verified at runtime, Phase E): the route is DELETE /task/:id/checklist/:itemId but the
+// backend controller reads :id as the CHECKLIST ITEM id. Calling it the documented way
+// (deleteChecklist(taskId, itemId)) returns 404. The drawers call deleteChecklist(itemId) — the item id lands in
+// :id and the delete works. Keep that call until the backend reads req.params.itemId; then pass (taskId, itemId).
 export const deleteChecklist = async (taskId, checklistId) => {
     const res = await fetch(`${API_BASE_URL}/task/${taskId}/checklist/${checklistId}`, {
         method: 'DELETE',

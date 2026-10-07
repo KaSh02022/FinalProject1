@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { KanbanSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../../../config/apiConfig.js";
 
 function ResetPassword() {
     const [newPassword, setNewPassword] = useState("");
@@ -44,7 +45,7 @@ function ResetPassword() {
 
         try {
             setLoading(true);
-            const res = await fetch("http://localhost:3000/api/user/reset-password", {
+            const res = await fetch(`${API_BASE_URL}/user/reset-password`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"

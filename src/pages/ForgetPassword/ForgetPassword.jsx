@@ -1,6 +1,7 @@
 import { KanbanSquare } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../../config/apiConfig.js";
 
 function ForgetPassword(){
     const [email, setEmail] = useState("");
@@ -21,7 +22,7 @@ function ForgetPassword(){
         try {
             setLoading(true);
 
-            const res = await fetch("http://localhost:3000/api/user/check-email", {
+            const res = await fetch(`${API_BASE_URL}/user/check-email`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"

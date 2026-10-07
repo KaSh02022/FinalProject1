@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 // Import socket instance từ file socket.js của bạn
@@ -20,6 +20,7 @@ import {
     fetchTaskActivities,
     moveTask
 } from './../../../api.jsx';
+import { API_BASE_URL } from "../../config/apiConfig.js";
 import "./project.css";
 import ErrorState from '../../components/common/ErrorState.jsx';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
@@ -33,6 +34,8 @@ import ProjectHeader from '../../components/project/ProjectHeader.jsx';
 import BoardToolbar from './board/BoardToolbar.jsx';
 import BoardColumnHeader from './board/BoardColumnHeader.jsx';
 import TaskCard from './board/TaskCard.jsx';
+import TaskDrawerFrame from '../../components/task/TaskDrawerFrame.jsx';
+import { DrawerSection, ChecklistSection, CommentsSection, ActivitySection, AssigneePicker, UserAvatar } from '../../components/task/TaskDrawerSections.jsx';
 
 // Helper function định dạng ngày theo chuẩn DD/MM/YYYY
 const formatDateDMY = (dateValue) => {
@@ -170,7 +173,7 @@ const calculateTaskWeekAndStatus = (task, project) => {
 };
 
 // ==========================================
-// COMPONENT TASK DRAWER
+// COMPONENT TASK DRAWER (Board) — data + permissions here, presentation in components/task/*
 // ==========================================
 function TaskDrawer({
                         taskId,
@@ -183,17 +186,21 @@ function TaskDrawer({
                         onTaskDeleted,
                         isManager = false,
                         isLeader = false,
-                        currentUserId = null
+                        syncEvent = null
                     }) {
     const [task, setTask] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState('');
+    const [reloadKey, setReloadKey] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState('');
 
-    const [checklistText, setChecklistText] = useState('');
     const [comments, setComments] = useState([]);
-    const [commentText, setCommentText] = useState('');
+    const [commentsError, setCommentsError] = useState('');
     const [activities, setActivities] = useState([]);
-    const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('');
+    const [activitiesError, setActivitiesError] = useState('');
+    // fields the user is typing in — a realtime update must not overwrite them
+    const dirtyFieldsRef = useRef(new Set());
 
     const canEditAll = isManager;
     const canEditManagement = isManager || isLeader;
@@ -201,49 +208,72 @@ function TaskDrawer({
     const canAddChecklist = isManager || isLeader;
     const canDeleteChecklist = isManager || isLeader;
 
+    const normalizeTask = (realTask) => ({
+        ...realTask,
+        name: realTask.name || realTask.title || '',
+        columnId: extractColumnId(realTask.columnId),
+        assignees: Array.isArray(realTask.assignees)
+            ? realTask.assignees.map(a => typeof a === 'object' ? String(a._id || a.id) : String(a))
+            : [],
+        points: realTask.points ?? realTask.point ?? 0,
+        week: realTask.week ?? 1
+    });
+
+    const loadActivities = () => fetchTaskActivities(taskId)
+        .then((data) => { setActivities(Array.isArray(data) ? data : (data?.data || [])); setActivitiesError(''); })
+        .catch((err) => setActivitiesError(failureMessage({ error: err })));
+    const loadComments = () => fetchTaskComments(taskId)
+        .then((data) => { setComments(Array.isArray(data) ? data : (data?.data || [])); setCommentsError(''); })
+        .catch((err) => setCommentsError(failureMessage({ error: err })));
+
     useEffect(() => {
-        if (isDrawerOpen && taskId) {
-            setLoading(true);
-            setAssigneeSearchQuery('');
-            Promise.all([
-                fetchTaskById(taskId),
-                fetchTaskComments(taskId).catch(() => []),
-                fetchTaskActivities(taskId).catch(() => [])
-            ])
-                .then(([taskData, commentsData, activitiesData]) => {
-                    const realTask = taskData?.data || taskData;
+        if (!isDrawerOpen || !taskId) return;
+        let cancelled = false;
+        setLoading(true);
+        setLoadError('');
+        setSaveError('');
+        dirtyFieldsRef.current.clear();
+        Promise.all([
+            fetchTaskById(taskId),
+            fetchTaskComments(taskId).then((d) => ({ ok: d }), (e) => ({ err: failureMessage({ error: e }) })),
+            fetchTaskActivities(taskId).then((d) => ({ ok: d }), (e) => ({ err: failureMessage({ error: e }) }))
+        ])
+            .then(([taskData, c, a]) => {
+                if (cancelled) return;
+                setTask(normalizeTask(taskData?.data || taskData));
+                setComments(c.ok ? (Array.isArray(c.ok) ? c.ok : (c.ok?.data || [])) : []);
+                setCommentsError(c.err || '');
+                setActivities(a.ok ? (Array.isArray(a.ok) ? a.ok : (a.ok?.data || [])) : []);
+                setActivitiesError(a.err || '');
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                console.error("Lỗi khi tải chi tiết task:", err);
+                setTask(null);
+                setLoadError(failureMessage({ error: err }));
+            })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [taskId, isDrawerOpen, reloadKey]);
 
-                    const formattedAssignees = Array.isArray(realTask.assignees)
-                        ? realTask.assignees.map(a => typeof a === 'object' ? String(a._id || a.id) : String(a))
-                        : [];
-
-                    setTask({
-                        ...realTask,
-                        name: realTask.name || realTask.title || '',
-                        columnId: extractColumnId(realTask.columnId),
-                        assignees: formattedAssignees,
-                        points: realTask.points ?? realTask.point ?? 0,
-                        week: realTask.week ?? 1
-                    });
-                    setComments(Array.isArray(commentsData) ? commentsData : (commentsData?.data || []));
-                    setActivities(Array.isArray(activitiesData) ? activitiesData : (activitiesData?.data || []));
-                })
-                .catch((err) => console.error("Lỗi khi tải chi tiết task:", err))
-                .finally(() => setLoading(false));
+    // Realtime: the board forwards socket events for the open task (one set of listeners, owned by the board)
+    useEffect(() => {
+        if (!syncEvent || !task) return;
+        if (syncEvent.type === 'task') {
+            const incoming = normalizeTask(syncEvent.data);
+            setTask(prev => {
+                if (!prev) return prev;
+                const next = { ...prev, ...incoming };
+                dirtyFieldsRef.current.forEach((field) => { next[field] = prev[field]; });
+                return next;
+            });
+        } else if (syncEvent.type === 'comment') {
+            setComments(prev => prev.some(c => String(c._id) === String(syncEvent.data._id)) ? prev : [...prev, syncEvent.data]);
         }
-    }, [taskId, isDrawerOpen]);
-
-    const filteredProjectMembers = useMemo(() => {
-        if (!assigneeSearchQuery.trim()) return projectMembers;
-        const query = assigneeSearchQuery.toLowerCase().trim();
-        return projectMembers.filter(member => {
-            const email = getMemberEmail(member).toLowerCase();
-            const name = getMemberDisplayName(member).toLowerCase();
-            return email.includes(query) || name.includes(query);
-        });
-    }, [projectMembers, assigneeSearchQuery]);
-
-    if (!isDrawerOpen) return null;
+        loadActivities();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [syncEvent]);
 
     const handleUpdateTaskField = async (updatedFields) => {
         if (!task || isSaving) return;
@@ -266,17 +296,19 @@ function TaskDrawer({
         const updatedTaskLocal = { ...task, ...updatedFields };
 
         setTask(updatedTaskLocal);
+        setSaveError('');
         if (onTaskUpdated) onTaskUpdated(updatedTaskLocal);
 
         try {
             setIsSaving(true);
             const updatedData = await updateTask(taskId, updatedFields);
             const returnedTask = updatedData?.data || updatedData;
+            Object.keys(updatedFields).forEach((f) => dirtyFieldsRef.current.delete(f));
 
             if (returnedTask) {
                 const finalTask = {
                     ...updatedTaskLocal,
-                    ...returnedTask,
+                    ...normalizeTask(returnedTask),
                     columnId: extractColumnId(returnedTask.columnId) || updatedTaskLocal.columnId,
                     points: returnedTask.points ?? returnedTask.point ?? updatedTaskLocal.points,
                     week: returnedTask.week ?? updatedTaskLocal.week
@@ -284,9 +316,11 @@ function TaskDrawer({
                 setTask(finalTask);
                 if (onTaskUpdated) onTaskUpdated(finalTask);
             }
+            loadActivities();
         } catch (error) {
             console.error("Lỗi khi cập nhật task, đang hoàn tác:", error);
             setTask(previousTask);
+            setSaveError(`Couldn't save changes — ${error.message}`);
             if (onTaskUpdated) onTaskUpdated(previousTask);
         } finally {
             setIsSaving(false);
@@ -299,6 +333,7 @@ function TaskDrawer({
             updatedFields.points = value;
             updatedFields.point = value;
         }
+        Object.keys(updatedFields).forEach((f) => dirtyFieldsRef.current.add(f));
         setTask(prev => {
             const nextState = { ...prev, ...updatedFields };
             if (onTaskUpdated) onTaskUpdated(nextState);
@@ -341,196 +376,147 @@ function TaskDrawer({
             handleCloseDrawer();
         } catch (error) {
             console.error("Lỗi khi xóa task:", error);
+            setSaveError(`Couldn't delete the task — ${error.message}`);
         }
     };
 
-    const handleAddChecklist = async () => {
-        if (!canAddChecklist || !checklistText.trim()) return;
+    // Checklist / comment actions return promises: the shared sections show progress and errors
+    const handleAddChecklist = async (text) => {
+        if (!canAddChecklist || !text.trim()) return;
+        const response = await addChecklistItem(taskId, text.trim());
+        const realTask = response?.data || response;
+        if (realTask && realTask.checklist) {
+            setTask(prev => ({ ...prev, checklist: realTask.checklist }));
+        }
+        loadActivities();
+    };
 
-        const textToSend = checklistText.trim();
-        setChecklistText('');
-
+    const handleToggleChecklist = async (item) => {
+        const previousChecklist = task.checklist;
+        setTask(prev => ({
+            ...prev,
+            checklist: (prev.checklist || []).map(i => String(i._id) === String(item._id) ? { ...i, completed: !item.completed } : i)
+        }));
         try {
-            const response = await addChecklistItem(taskId, textToSend);
+            const response = await toggleChecklistItem(taskId, item._id, item.completed);
             const realTask = response?.data || response;
             if (realTask && realTask.checklist) {
                 setTask(prev => ({ ...prev, checklist: realTask.checklist }));
             }
-        } catch (error) {
-            console.error("Lỗi khi thêm checklist:", error);
-        }
-    };
-
-    const handleToggleChecklist = async (itemId, completed) => {
-        const updatedChecklist = (task.checklist || []).map(item =>
-            String(item._id) === String(itemId) ? { ...item, completed: !completed } : item
-        );
-        setTask(prev => ({ ...prev, checklist: updatedChecklist }));
-
-        try {
-            const response = await toggleChecklistItem(taskId, itemId, completed);
-            const realTask = response?.data || response;
-
-            if (realTask && realTask.checklist) {
-                setTask(prev => ({ ...prev, checklist: realTask.checklist }));
-            }
+            loadActivities();
         } catch (error) {
             console.error("Lỗi khi cập nhật checklist:", error);
-            setTask(prev => ({ ...prev, checklist: task.checklist }));
+            setTask(prev => ({ ...prev, checklist: previousChecklist }));
+            throw error;
         }
     };
 
-    const handleDeleteChecklist = async (checklistId) => {
+    const handleDeleteChecklist = async (item) => {
         if (!canDeleteChecklist) return;
         if (!window.confirm("Bạn có chắc chắn muốn xóa checklist này?")) return;
 
         const previousChecklist = task.checklist;
-        const updatedChecklist = (task.checklist || []).filter(
-            item => String(item._id) !== String(checklistId)
-        );
-        setTask(prev => ({ ...prev, checklist: updatedChecklist }));
+        setTask(prev => ({ ...prev, checklist: (prev.checklist || []).filter(i => String(i._id) !== String(item._id)) }));
 
         try {
-            if (typeof deleteChecklist === 'function') {
-                await deleteChecklist(checklistId);
-            }
+            // see the BACKEND MISMATCH note on deleteChecklist in api.jsx — the item id is passed on purpose
+            await deleteChecklist(item._id);
         } catch (error) {
             console.error("Lỗi khi xóa checklist:", error);
             setTask(prev => ({ ...prev, checklist: previousChecklist }));
+            throw error;
         }
     };
 
-    const handleAddComment = async (e) => {
-        e.preventDefault();
-        if (!commentText.trim()) return;
-
-        const textToSend = commentText;
-        setCommentText('');
-
-        try {
-            const newComment = await addComment(taskId, textToSend);
-            setComments(prev => [...prev, newComment?.data || newComment]);
-        } catch (error) {
-            console.error("Lỗi khi gửi bình luận:", error);
-        }
+    const handleAddComment = async (text) => {
+        const newComment = await addComment(taskId, text);
+        const created = newComment?.data || newComment;
+        setComments(prev => prev.some(c => String(c._id) === String(created._id)) ? prev : [...prev, created]);
+        loadActivities();
     };
 
-    const renderPriorityBadge = (priority) => {
-        const priorityConfig = {
-            Low: { color: '#2563eb', bg: '#eff6ff' },
-            Medium: { color: '#d97706', bg: '#fffbeb' },
-            High: { color: '#dc2626', bg: '#fef2f2' },
-            Urgent: { color: '#7c3aed', bg: '#f5f3ff' }
-        };
-        const config = priorityConfig[priority] || priorityConfig.Medium;
-
-        return (
-            <span className="priority-badge" style={{ color: config.color, background: config.bg, padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <span className="icon icon-xs">
-                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" strokeWidth="2">
-                        <path d="M12 5v14"></path>
-                        <path d="m19 12-7 7-7-7"></path>
-                    </svg>
-                </span>
-                <span>{priority}</span>
-            </span>
-        );
-    };
-
-    const totalChecklist = task?.checklist?.length || 0;
-    const completedChecklist = task?.checklist?.filter(item => item.completed)?.length || 0;
-    const progressPercent = totalChecklist > 0 ? Math.round((completedChecklist / totalChecklist) * 100) : 0;
+    const column = columns.find(c => String(c._id) === String(task?.columnId));
+    const assigneeMembers = projectMembers.filter(m => (task?.assignees || []).includes(extractUserId(m)));
 
     return (
-        <div className={`drawer-overlay ${isDrawerOpen ? "" : "hidden"}`} id="taskDrawer">
-            <div className="drawer-panel">
-                <div className="drawer-header">
-                    <div className="drawer-header-meta" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {renderPriorityBadge(task?.priority || 'Medium')}
-                        <span style={{ fontSize: '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            {isSaving ? (
-                                <>
-                                    <Loader2 className="animate-spin" size={14} />
-                                    <span>Updating...</span>
-                                </>
-                            ) : (
-                                task?.updatedAt ? `Updated ${formatDateDMY(task.updatedAt)}` : 'Recently'
-                            )}
-                        </span>
-                    </div>
-                    <button className="icon-btn" onClick={handleCloseDrawer} aria-label="Close panel" style={{ cursor: 'pointer' }}>
-                        <span className="icon">
-                            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" strokeWidth="2">
-                                <path d="M18 6 6 18"></path>
-                                <path d="m6 6 12 12"></path>
-                            </svg>
-                        </span>
-                    </button>
+        <TaskDrawerFrame
+            open={isDrawerOpen}
+            onClose={handleCloseDrawer}
+            labelledBy="task-drawer-title"
+            returnFocusSelector={taskId ? `[data-rfd-draggable-id="${taskId}"]` : undefined}
+            headerContent={
+                <>
+                    {task && <span className={`priority-tag priority-${(task.priority || 'Medium').toLowerCase()}`}>{task.priority || 'Medium'}</span>}
+                    <span className="drawer-save-state" role="status">
+                        {isSaving ? (
+                            <><Loader2 className="icon icon-sm animate-spin" aria-hidden="true" /> Saving…</>
+                        ) : task?.updatedAt ? `Updated ${formatDateDMY(task.updatedAt)}` : ''}
+                    </span>
+                </>
+            }
+        >
+            {loading ? (
+                <div className="drawer-body drawer-state" role="status">
+                    <Loader2 className="icon animate-spin" aria-hidden="true" />
+                    <span>Loading task…</span>
                 </div>
-
-                {loading || !task ? (
-                    <div className="drawer-body" style={{ padding: '48px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', color: '#6b7280' }}>
-                        <Loader2 className="animate-spin" size={32} style={{ color: '#4f46e5' }} />
-                        <span>Loading...</span>
-                    </div>
-                ) : (
-                    <div className="drawer-body">
+            ) : loadError || !task ? (
+                <div className="drawer-body">
+                    <ErrorState
+                        title="Couldn't load this task"
+                        message={loadError || 'The task could not be loaded.'}
+                        onRetry={() => setReloadKey(k => k + 1)}
+                    />
+                </div>
+            ) : (
+                <div className="drawer-body">
+                    <div className="drawer-title-block">
                         <textarea
+                            id="task-drawer-title"
                             className="drawer-title-input"
-                            rows="1"
+                            rows="2"
+                            aria-label="Task title"
                             value={task.title || ''}
                             readOnly={!canEditManagement}
-                            style={{ cursor: canEditManagement ? 'text' : 'not-allowed' }}
                             onChange={(e) => handleInputChange('title', e.target.value)}
-                            onBlur={(e) => handleUpdateTaskField({ title: e.target.value })}
-                            placeholder="Nhập tiêu đề task..."
+                            onBlur={(e) => canEditManagement && handleUpdateTaskField({ title: e.target.value })}
+                            placeholder="Task title"
                         />
+                        <div className="drawer-subline">
+                            {column && <span className="drawer-chip">{column.title || column.name}</span>}
+                            {assigneeMembers.length > 0 && (
+                                <span className="avatar-group">
+                                    {assigneeMembers.map(m => (
+                                        <UserAvatar key={extractUserId(m)} userId={extractUserId(m)} name={getMemberDisplayName(m)} size="xs" />
+                                    ))}
+                                </span>
+                            )}
+                        </div>
+                    </div>
 
+                    {saveError && <div className="drawer-inline-error" role="alert">{saveError}</div>}
+
+                    <DrawerSection title="Properties">
                         <div className="drawer-field-grid">
-                            <div style={{ gridColumn: 'span 2' }}>
-                                <span className="drawer-field-label">Title</span>
-                                <input
-                                    className="input"
-                                    type="text"
-                                    value={task.title || ''}
-                                    readOnly={!canEditAll}
-                                    disabled={!canEditAll}
-                                    style={{
-                                        backgroundColor: canEditAll ? '#ffffff' : '#f3f4f6',
-                                        cursor: canEditAll ? 'text' : 'not-allowed',
-                                        color: '#374151',
-                                        fontWeight: 500
-                                    }}
-                                    onChange={(e) => handleInputChange('title', e.target.value)}
-                                    onBlur={(e) => handleUpdateTaskField({ title: e.target.value })}
-                                    placeholder="Task's title"
-                                />
-                            </div>
-
-                            <div>
-                                <span className="drawer-field-label">Status</span>
+                            <label className="drawer-field">
+                                <span className="drawer-field-label">Column</span>
                                 <select
                                     className="select"
                                     value={extractColumnId(task.columnId)}
                                     disabled={!canEditAll}
-                                    style={{ backgroundColor: canEditAll ? '#ffffff' : '#f3f4f6', cursor: canEditAll ? 'pointer' : 'not-allowed' }}
                                     onChange={(e) => handleUpdateTaskField({ columnId: e.target.value })}
                                 >
                                     {columns.map((col) => (
-                                        <option key={col._id} value={String(col._id)}>
-                                            {col.name || col.title}
-                                        </option>
+                                        <option key={col._id} value={String(col._id)}>{col.name || col.title}</option>
                                     ))}
                                 </select>
-                            </div>
-
-                            <div>
+                            </label>
+                            <label className="drawer-field">
                                 <span className="drawer-field-label">Priority</span>
                                 <select
                                     className="select"
                                     value={task.priority || 'Medium'}
                                     disabled={!canEditAll}
-                                    style={{ backgroundColor: canEditAll ? '#ffffff' : '#f3f4f6', cursor: canEditAll ? 'pointer' : 'not-allowed' }}
                                     onChange={(e) => handleUpdateTaskField({ priority: e.target.value })}
                                 >
                                     <option value="Low">Low</option>
@@ -538,9 +524,8 @@ function TaskDrawer({
                                     <option value="High">High</option>
                                     <option value="Urgent">Urgent</option>
                                 </select>
-                            </div>
-
-                            <div>
+                            </label>
+                            <label className="drawer-field">
                                 <span className="drawer-field-label">Points</span>
                                 <input
                                     className="input"
@@ -548,216 +533,82 @@ function TaskDrawer({
                                     min="0"
                                     value={task.points ?? task.point ?? 0}
                                     disabled={!canEditAll}
-                                    style={{ backgroundColor: canEditAll ? '#ffffff' : '#f3f4f6', cursor: canEditAll ? 'text' : 'not-allowed' }}
                                     onChange={(e) => handleInputChange('points', e.target.value)}
                                     onBlur={(e) => handleUpdateTaskField({ points: Number(e.target.value) || 0, point: Number(e.target.value) || 0 })}
                                 />
-                            </div>
-
-                            <div>
+                            </label>
+                            <label className="drawer-field">
                                 <span className="drawer-field-label">Week</span>
                                 <select
                                     className="select"
                                     value={task.week || 1}
                                     disabled={!canEditAll}
-                                    style={{ backgroundColor: canEditAll ? '#ffffff' : '#f3f4f6', cursor: canEditAll ? 'pointer' : 'not-allowed' }}
                                     onChange={(e) => handleUpdateTaskField({ week: Number(e.target.value) })}
                                 >
                                     {Array.from({ length: maxWeeks }, (_, i) => i + 1).map(w => (
                                         <option key={w} value={w}>Week {w}</option>
                                     ))}
                                 </select>
-                            </div>
-
-                            <div style={{ gridColumn: 'span 2' }}>
+                            </label>
+                            <div className="drawer-field drawer-field--wide">
                                 <span className="drawer-field-label">
-                                    Assignees {task.assignees?.length > 0 && `(${task.assignees.length} selected)`}
+                                    Assignees{task.assignees?.length > 0 ? ` · ${task.assignees.length}` : ''}
                                 </span>
-
-                                <input
-                                    className="input"
-                                    type="text"
-                                    placeholder="Search assignee by email..."
-                                    value={assigneeSearchQuery}
-                                    onChange={(e) => setAssigneeSearchQuery(e.target.value)}
-                                    style={{ marginBottom: '6px', fontSize: '13px' }}
+                                <AssigneePicker
+                                    members={projectMembers}
+                                    selectedIds={task.assignees || []}
+                                    canEdit={canEditManagement}
+                                    onToggle={handleToggleAssignee}
+                                    getUserId={extractUserId}
+                                    getName={getMemberDisplayName}
+                                    getEmail={getMemberEmail}
                                 />
-
-                                <div className="card" style={{ maxHeight: '140px', overflowY: 'auto', padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    {filteredProjectMembers.map((member, idx) => {
-                                        const memberUserId = extractUserId(member);
-                                        const memberRecordId = String(member._id || member.id || '');
-                                        const name = getMemberDisplayName(member);
-                                        const email = getMemberEmail(member);
-
-                                        const isChecked = task.assignees?.some(a => {
-                                            const id = typeof a === 'object' ? String(a._id || a.id) : String(a);
-                                            return id === String(memberUserId) || id === memberRecordId;
-                                        });
-
-                                        return (
-                                            <label key={memberRecordId || idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: canEditManagement ? 'pointer' : 'not-allowed', fontSize: '13px' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    className="checkbox"
-                                                    checked={!!isChecked}
-                                                    disabled={!canEditManagement}
-                                                    style={{ cursor: canEditManagement ? 'pointer' : 'not-allowed' }}
-                                                    onChange={() => handleToggleAssignee(member)}
-                                                />
-                                                <span className="avatar avatar-xs" style={{ background: '#4f46e5', color: '#fff', fontSize: '10px', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    {getInitials(name)}
-                                                </span>
-                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                    <span>{name}</span>
-                                                    {email && <span style={{ fontSize: '11px', color: '#6b7280' }}>{email}</span>}
-                                                </div>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
                             </div>
                         </div>
+                    </DrawerSection>
 
-                        <div>
-                            <span className="drawer-field-label">Description</span>
-                            <textarea
-                                className="textarea"
-                                rows="3"
-                                placeholder="Add a more detailed description…"
-                                value={task.description || ''}
-                                readOnly={!canEditAll}
-                                style={{ backgroundColor: canEditAll ? '#ffffff' : '#f3f4f6', cursor: canEditAll ? 'text' : 'not-allowed' }}
-                                onChange={(e) => handleInputChange('description', e.target.value)}
-                                onBlur={(e) => handleUpdateTaskField({ description: e.target.value })}
-                            />
+                    <DrawerSection title="Description">
+                        <textarea
+                            className="textarea"
+                            rows="4"
+                            aria-label="Description"
+                            placeholder={canEditAll ? 'Add a more detailed description…' : 'No description.'}
+                            value={task.description || ''}
+                            readOnly={!canEditAll}
+                            onChange={(e) => handleInputChange('description', e.target.value)}
+                            onBlur={(e) => canEditAll && handleUpdateTaskField({ description: e.target.value })}
+                        />
+                    </DrawerSection>
+
+                    <ChecklistSection
+                        items={task.checklist || []}
+                        canToggle
+                        canAdd={canAddChecklist}
+                        canDelete={canDeleteChecklist}
+                        onToggle={handleToggleChecklist}
+                        onAdd={handleAddChecklist}
+                        onDelete={handleDeleteChecklist}
+                    />
+
+                    <CommentsSection
+                        comments={comments}
+                        loadError={commentsError}
+                        onRetry={loadComments}
+                        onSubmit={handleAddComment}
+                    />
+
+                    <ActivitySection activities={activities} loadError={activitiesError} onRetry={loadActivities} />
+
+                    {canDeleteTask && (
+                        <div className="drawer-danger">
+                            <button type="button" className="btn btn-outline btn-sm drawer-delete-task" onClick={handleDeleteTask}>
+                                Delete task
+                            </button>
                         </div>
-
-                        <div className="drawer-section">
-                            <div className="checklist-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                <span className="comments-title">Checklists</span>
-                                <span className="checklist-count">{completedChecklist}/{totalChecklist}</span>
-                            </div>
-                            <div className="progress-bar" style={{ height: '6px', background: '#e2e8f0', borderRadius: '3px', marginBottom: '12px', overflow: 'hidden' }}>
-                                <span
-                                    className="progress-bar-fill tone-success"
-                                    style={{ display: 'block', height: '100%', background: '#22c55e', width: `${progressPercent}%`, transition: 'width 0.3s' }}
-                                ></span>
-                            </div>
-                            <div className="checklist-items" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                {task.checklist && task.checklist.map((item, index) => (
-                                    <div
-                                        key={item._id || index}
-                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0' }}
-                                    >
-                                        <label className="checklist-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1 }}>
-                                            <input
-                                                type="checkbox"
-                                                className="checkbox"
-                                                checked={item.completed || false}
-                                                style={{ cursor: 'pointer' }}
-                                                onChange={() => handleToggleChecklist(item._id, item.completed)}
-                                            />
-                                            <span className={`checklist-text ${item.completed ? 'completed' : ''}`} style={{ textDecoration: item.completed ? 'line-through' : 'none', color: item.completed ? '#9ca3af' : 'inherit', cursor: 'pointer' }}>
-                                                {item.text || item.title}
-                                            </span>
-                                        </label>
-
-                                        {canDeleteChecklist && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleDeleteChecklist(item._id)}
-                                                title="Xóa checklist"
-                                                style={{
-                                                    background: 'transparent',
-                                                    border: 'none',
-                                                    color: '#ef4444',
-                                                    cursor: 'pointer',
-                                                    fontSize: '14px',
-                                                    fontWeight: 'bold',
-                                                    padding: '0 6px',
-                                                    lineHeight: 1
-                                                }}
-                                            >
-                                                ✕
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-
-                            {canAddChecklist && (
-                                <div className="checklist-add-row" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                                    <input
-                                        className="input"
-                                        placeholder="Add checklist item…"
-                                        value={checklistText}
-                                        onChange={(e) => setChecklistText(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleAddChecklist()}
-                                    />
-                                    <button className="checklist-add-btn btn btn-secondary" onClick={handleAddChecklist} aria-label="Add checklist item" style={{ cursor: 'pointer' }}>
-                                        +
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="drawer-section">
-                            <p className="comments-title" style={{ fontWeight: 600, marginBottom: '8px' }}>Comments</p>
-                            <div className="comments-list" style={{ marginBottom: '12px' }}>
-                                {comments.length === 0 ? (
-                                    <div className="empty-state" style={{ padding: '16px 0', textAlign: 'center' }}>
-                                        <p className="empty-state-title" style={{ fontSize: '14px', color: '#6b7280' }}>No comments yet</p>
-                                    </div>
-                                ) : (
-                                    comments.map((comment, idx) => (
-                                        <div key={comment._id || idx} className="comment-item" style={{ marginBottom: '8px', fontSize: '14px' }}>
-                                            <strong>{comment.user?.username || comment.user?.name || 'User'}: </strong>
-                                            <span>{comment.text}</span>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                            <form className="comment-form" onSubmit={handleAddComment}>
-                                <textarea
-                                    className="textarea"
-                                    rows="2"
-                                    placeholder="Write a comment…"
-                                    value={commentText}
-                                    onChange={(e) => setCommentText(e.target.value)}
-                                />
-                                <div className="comment-form-actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                                    <button type="submit" className="btn btn-primary btn-sm" style={{ cursor: 'pointer' }}>Send</button>
-                                </div>
-                            </form>
-                        </div>
-
-                        <div className="drawer-section">
-                            <p className="comments-title" style={{ fontWeight: 600, marginBottom: '8px' }}>Activities</p>
-                            <ol className="timeline" style={{ paddingLeft: '16px', fontSize: '13px', color: '#4b5563' }}>
-                                {activities.map((act, index) => (
-                                    <li key={act._id || index} className="timeline-item" style={{ marginBottom: '6px' }}>
-                                        <strong>{act.user?.username || act.user?.name || 'User'}</strong> {act.action || 'đã thao tác'}
-                                    </li>
-                                ))}
-                            </ol>
-                        </div>
-
-                        {canDeleteTask && (
-                            <div className="drawer-section" style={{ marginTop: '24px' }}>
-                                <button
-                                    className="btn btn-outline btn-full"
-                                    style={{ color: '#dc2626', borderColor: '#fca5a5', width: '100%', cursor: 'pointer' }}
-                                    onClick={handleDeleteTask}
-                                >
-                                    Delete task
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
+                    )}
+                </div>
+            )}
+        </TaskDrawerFrame>
     );
 }
 
@@ -784,6 +635,10 @@ export default function ProjectBoard({ projectId: propProjectId }) {
     const [isColumnFixed, setIsColumnFixed] = useState(false);
 
     const [selectedTaskId, setSelectedTaskId] = useState(null);
+    // socket events for the task open in the drawer (forwarded so the drawer needs no listeners of its own)
+    const [drawerSync, setDrawerSync] = useState(null);
+    const selectedTaskIdRef = useRef(null);
+    useEffect(() => { selectedTaskIdRef.current = selectedTaskId; }, [selectedTaskId]);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
     const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -811,7 +666,7 @@ export default function ProjectBoard({ projectId: propProjectId }) {
             const token = localStorage.getItem("token");
             if (!token) return;
 
-            const res = await fetch("http://localhost:3000/api/user/currentUser", {
+            const res = await fetch(`${API_BASE_URL}/user/currentUser`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const data = await res.json();
@@ -933,6 +788,7 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                     return t;
                 })
             );
+            if (String(selectedTaskIdRef.current) === taskId) setDrawerSync({ type: 'task', data: taskData, at: Date.now() });
         };
 
         // Sự kiện 3: Khi Kéo Thả / Di chuyển Task
@@ -954,6 +810,13 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                     return t;
                 })
             );
+            if (String(selectedTaskIdRef.current) === taskId) setDrawerSync({ type: 'task', data: { _id: taskId, columnId: targetColumnId }, at: Date.now() });
+        };
+
+        // Sự kiện 5: Comment mới (chỉ drawer của task đang mở cần)
+        const handleCommentAdded = (comment) => {
+            if (!comment || String(comment.taskId) !== String(selectedTaskIdRef.current)) return;
+            setDrawerSync({ type: 'comment', data: comment, at: Date.now() });
         };
 
         // Sự kiện 4: Khi Task bị xóa
@@ -969,6 +832,7 @@ export default function ProjectBoard({ projectId: propProjectId }) {
         socket.on('task_updated', handleTaskUpdated);
         socket.on('task_moved', handleTaskMoved);
         socket.on('task_deleted', handleTaskDeleted);
+        socket.on('comment_added', handleCommentAdded);
 
         // Hủy đăng ký listener và rời room khi unmount
         return () => {
@@ -977,6 +841,7 @@ export default function ProjectBoard({ projectId: propProjectId }) {
             socket.off('task_updated', handleTaskUpdated);
             socket.off('task_moved', handleTaskMoved);
             socket.off('task_deleted', handleTaskDeleted);
+            socket.off('comment_added', handleCommentAdded);
         };
     }, [activeProjectId]);
 
@@ -1036,10 +901,6 @@ export default function ProjectBoard({ projectId: propProjectId }) {
         }
 
         return Array.from(columnTaskMap.values());
-    };
-
-    const getCurrentUserId = () => {
-        return currentUser._id || currentUser.id || null;
     };
 
     const resetTaskForm = () => {
@@ -1384,7 +1245,7 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                 onTaskDeleted={handleTaskDeletedFromDrawer}
                 isManager={isManager}
                 isLeader={isLeader}
-                currentUserId={getCurrentUserId()}
+                syncEvent={drawerSync}
             />
 
             {canCreateTask && activeModal === 'quickCreateTaskModal' && (

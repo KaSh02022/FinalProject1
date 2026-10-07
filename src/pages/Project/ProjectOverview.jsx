@@ -10,6 +10,7 @@ import {
     uploadProjectDocument,
     deleteProjectDocument
 } from './../../../api.jsx';
+import { API_ORIGIN } from "../../config/apiConfig.js";
 import "./project.css";
 import {
     Loader2,
@@ -23,7 +24,8 @@ import {
 import ProjectHeader from '../../components/project/ProjectHeader.jsx';
 
 // Domain Backend chứa thư mục uploads
-const API_BASE_URL = "http://localhost:3000";
+// uploads are served from the backend origin
+const API_BASE_URL = API_ORIGIN;
 
 // Helper function format ngày dạng DD/MM/YYYY
 const formatDate = (dateString, fallback = 'Chưa đặt') => {

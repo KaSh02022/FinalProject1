@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { KanbanSquare, ArrowRight, Lock, Mail } from 'lucide-react';
+import { API_BASE_URL } from "../../config/apiConfig.js";
 
 const DEMO_USERS = [
     { name: 'Cao Sơn', role: 'Team Leader', initials: 'CS', color: '#4f46e5', email: 'cason@teamflow.dev' },
@@ -28,7 +29,7 @@ export default function LoginPage() {
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://localhost:3000/api/user/login', {
+            const response = await fetch(`${API_BASE_URL}/user/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),

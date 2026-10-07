@@ -20,6 +20,7 @@ import {
 import { Link } from "react-router-dom";
 import ErrorState from '../../components/common/ErrorState.jsx';
 import { failureMessage } from '../../utils/requestState.js';
+import { avatarToneClass } from "../../utils/avatar.js";
 
 const COLOR_OPTIONS = [
     '#4f46e5',
@@ -480,29 +481,19 @@ export default function Projects() {
                                             </div>
 
                                             <div className="project-card-footer">
-                                                <span className="avatar-group" style={{ display: 'flex', alignItems: 'center' }}>
+                                                <span className="avatar-group">
                                                     {memberList.slice(0, 4).map((member, index) => {
                                                         const displayName = getMemberDisplayName(member);
                                                         const initials = getInitials(displayName);
+                                                        // same color seed as task cards / drawer: the USER id (KI-26)
+                                                        const userId = typeof member.userId === 'object'
+                                                            ? (member.userId?._id || member.userId?.id)
+                                                            : (member.userId || member._id || member.id);
 
                                                         return (
                                                             <span
                                                                 key={member._id || member.id || index}
-                                                                className="avatar avatar-xs"
-                                                                style={{
-                                                                    background: '#4f46e5',
-                                                                    color: '#ffffff',
-                                                                    fontWeight: 600,
-                                                                    fontSize: '11px',
-                                                                    marginLeft: index > 0 ? '-6px' : '0',
-                                                                    border: '2px solid #ffffff',
-                                                                    borderRadius: '50%',
-                                                                    width: '24px',
-                                                                    height: '24px',
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center'
-                                                                }}
+                                                                className={`avatar avatar-sm ${avatarToneClass(userId)}`}
                                                                 title={displayName}
                                                             >
                                                                 {initials}
@@ -510,23 +501,7 @@ export default function Projects() {
                                                         );
                                                     })}
                                                     {memberList.length > 4 && (
-                                                        <span
-                                                            className="avatar avatar-xs"
-                                                            style={{
-                                                                background: '#9ca3af',
-                                                                color: '#ffffff',
-                                                                fontSize: '10px',
-                                                                fontWeight: 600,
-                                                                marginLeft: '-6px',
-                                                                border: '2px solid #ffffff',
-                                                                borderRadius: '50%',
-                                                                width: '24px',
-                                                                height: '24px',
-                                                                display: 'inline-flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center'
-                                                            }}
-                                                        >
+                                                        <span className="avatar-overflow avatar-sm">
                                                             +{memberList.length - 4}
                                                         </span>
                                                     )}
