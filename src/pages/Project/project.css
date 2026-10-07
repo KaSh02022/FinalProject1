@@ -52,20 +52,6 @@
    TASK CARD (thẻ công việc trong Kanban)
    ========================================================= */
 
-.task-card-meta {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    font-size: 11.5px;
-    color: var(--color-text-muted);
-}
-
-.task-card-meta-item {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-}
-
 .due-overdue { color: var(--color-danger); }
 .due-today { color: var(--color-warning); }
 
@@ -294,6 +280,13 @@ svg {
     font-weight: 600;
     flex-shrink: 0;
 }
+/* KI-12: .avatar above (32px, loaded after style.css) used to override style.css's .avatar-xs,
+   so every .avatar-xs rendered at 32px. Restate it inside this family. */
+.avatar-xs {
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+}
 .avatar-sm {
     width: 24px;
     height: 24px;
@@ -393,36 +386,6 @@ svg {
 
 .progress-bar-fill.high {
     background-color: #10b981; /* Xanh lá đậm cho tiến độ cao/hoàn thành (>= 80%) */
-}
-
-/* Nhóm các avatar xếp chồng ở góc dưới bên phải */
-.task-assignees-group {
-    display: flex;
-    align-items: center;
-    margin-left: auto;
-}
-
-/* Đĩa Avatar đại diện cho từng người dùng */
-.task-assignee-avatar {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    background-color: var(--color-primary-600);
-    color: var(--color-on-primary);
-    font-size: 10px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid var(--color-surface);
-    margin-left: -6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    text-transform: uppercase;
-    user-select: none;
-}
-
-.task-assignees-group .task-assignee-avatar:first-child {
-    margin-left: 0;
 }
 
 .auth-wrap.size-lg {

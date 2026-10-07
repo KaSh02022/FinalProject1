@@ -139,6 +139,14 @@
   --color-on-primary: #ffffff;          /* text/icons on primary or other solid colored backgrounds */
   --color-overlay: rgb(15 23 42 / 0.4); /* backdrop behind modal / drawer / mobile sidebar */
 
+  /* Avatar tones (stable color per person; white initials stay AA-readable) */
+  --avatar-tone-0: #4f46e5;
+  --avatar-tone-1: #0369a1;
+  --avatar-tone-2: #047857;
+  --avatar-tone-3: #c2410c;
+  --avatar-tone-4: #be185d;
+  --avatar-tone-5: #6d28d9;
+
   /* Workflow status (Kanban column icons; mapped from column name) */
   --status-backlog: #94a3b8;
   --status-todo: #64748b;
@@ -488,6 +496,13 @@ svg.icon.icon-xl { width: 24px; height: 24px; }
 .avatar-sm { width: 24px; height: 24px; font-size: 11px; }
 .avatar-md { width: 32px; height: 32px; font-size: 12px; }
 .avatar-lg { width: 40px; height: 40px; font-size: 14px; }
+.avatar-tone-0 { background-color: var(--avatar-tone-0); }
+.avatar-tone-1 { background-color: var(--avatar-tone-1); }
+.avatar-tone-2 { background-color: var(--avatar-tone-2); }
+.avatar-tone-3 { background-color: var(--avatar-tone-3); }
+.avatar-tone-4 { background-color: var(--avatar-tone-4); }
+.avatar-tone-5 { background-color: var(--avatar-tone-5); }
+.avatar-overflow.avatar-xs { width: 20px; height: 20px; font-size: 9px; }
 
 .avatar-group {
   display: inline-flex;

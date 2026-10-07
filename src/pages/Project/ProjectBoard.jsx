@@ -26,13 +26,13 @@ import { withFallback, failureMessage } from '../../utils/requestState.js';
 import {
     Plus,
     Loader2,
-    Check,
-    X
-    } from "lucide-react";
+    Check
+} from "lucide-react";
 
 import ProjectHeader from '../../components/project/ProjectHeader.jsx';
 import BoardToolbar from './board/BoardToolbar.jsx';
 import BoardColumnHeader from './board/BoardColumnHeader.jsx';
+import TaskCard from './board/TaskCard.jsx';
 
 // Helper function định dạng ngày theo chuẩn DD/MM/YYYY
 const formatDateDMY = (dateValue) => {
@@ -1318,6 +1318,11 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                                                             const canDragThisTask = isManager || isLeader || isTaskAssignee;
 
                                                             const { displayWeek, status } = calculateTaskWeekAndStatus(task, project);
+                                                            const assigneeList = assignees.map((assignee, aIdx) => {
+                                                                const name = getMemberDisplayName(getUserInfo(assignee, projectMembers));
+                                                                const id = typeof assignee === 'object' ? (assignee._id || assignee.id || aIdx) : assignee;
+                                                                return { id: String(id), name, initials: getInitials(name) };
+                                                            });
 
                                                             return (
                                                                 <Draggable
@@ -1327,194 +1332,20 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                                                                     isDragDisabled={!canDragThisTask}
                                                                 >
                                                                     {(provided, snapshot) => (
-                                                                        <div
-                                                                            className={`task-card${canDragThisTask ? ' is-draggable' : ' is-locked'}${snapshot.isDragging ? ' is-dragging' : ''}`}
-                                                                            ref={provided.innerRef}
-                                                                            {...provided.draggableProps}
-                                                                            {...provided.dragHandleProps}
-                                                                            onClick={() => handleOpenTaskDrawer(task._id || task.id)}
-                                                                            style={provided.draggableProps.style}
-                                                                        >
-                                                                            <div
-                                                                                className="task-card-top"
-                                                                                style={{
-                                                                                    display: 'flex',
-                                                                                    justifyContent: 'space-between',
-                                                                                    alignItems: 'flex-start',
-                                                                                    gap: '8px',
-                                                                                    marginBottom: '8px',
-                                                                                    paddingRight: showNotAcceptBtn ? '32px' : '0'
-                                                                                }}
-                                                                            >
-                                                                                <div className="task-card-title" style={{ flex: 1, margin: 0, fontWeight: 500 }}>
-                                                                                    {task.title || task.name}
-                                                                                </div>
-
-                                                                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                                                                    {status === 'Overdue' && (
-                                                                                        <span
-                                                                                            title="Task đã quá hạn dự án"
-                                                                                            style={{
-                                                                                                background: '#fef2f2',
-                                                                                                color: '#dc2626',
-                                                                                                border: '1px solid #fca5a5',
-                                                                                                borderRadius: '12px',
-                                                                                                padding: '1px 7px',
-                                                                                                fontSize: '11px',
-                                                                                                fontWeight: 600,
-                                                                                                lineHeight: '16px',
-                                                                                                whiteSpace: 'nowrap'
-                                                                                            }}
-                                                                                        >
-                                                                                            Overdue
-                                                                                        </span>
-                                                                                    )}
-
-                                                                                    {status === 'Expiring' && (
-                                                                                        <span
-                                                                                            title="Task sắp hết hạn tuần"
-                                                                                            style={{
-                                                                                                background: '#fef3c7',
-                                                                                                color: '#d97706',
-                                                                                                border: '1px solid #fde68a',
-                                                                                                borderRadius: '12px',
-                                                                                                padding: '1px 7px',
-                                                                                                fontSize: '11px',
-                                                                                                fontWeight: 600,
-                                                                                                lineHeight: '16px',
-                                                                                                whiteSpace: 'nowrap'
-                                                                                            }}
-                                                                                        >
-                                                                                            Expiring
-                                                                                        </span>
-                                                                                    )}
-
-                                                                                    {status === 'On Track' && (
-                                                                                        <span
-                                                                                            title="Task đang đúng tiến độ"
-                                                                                            style={{
-                                                                                                background: '#dcfce7',
-                                                                                                color: '#15803d',
-                                                                                                border: '1px solid #bbf7d0',
-                                                                                                borderRadius: '12px',
-                                                                                                padding: '1px 7px',
-                                                                                                fontSize: '11px',
-                                                                                                fontWeight: 600,
-                                                                                                lineHeight: '16px',
-                                                                                                whiteSpace: 'nowrap'
-                                                                                            }}
-                                                                                        >
-                                                                                            On Track
-                                                                                        </span>
-                                                                                    )}
-
-                                                                                    <span
-                                                                                        title="Week"
-                                                                                        style={{
-                                                                                            background: '#e0e7ff',
-                                                                                            color: '#3730a3',
-                                                                                            border: '1px solid #c7d2fe',
-                                                                                            borderRadius: '12px',
-                                                                                            padding: '1px 7px',
-                                                                                            fontSize: '11px',
-                                                                                            fontWeight: 600,
-                                                                                            lineHeight: '16px',
-                                                                                            whiteSpace: 'nowrap'
-                                                                                        }}
-                                                                                    >
-                                                                                        W{displayWeek}
-                                                                                    </span>
-                                                                                    <span
-                                                                                        title="Story Points"
-                                                                                        style={{
-                                                                                            background: '#f1f5f9',
-                                                                                            color: '#475569',
-                                                                                            border: '1px solid #e2e8f0',
-                                                                                            borderRadius: '12px',
-                                                                                            padding: '1px 7px',
-                                                                                            fontSize: '11px',
-                                                                                            fontWeight: 600,
-                                                                                            lineHeight: '16px',
-                                                                                            whiteSpace: 'nowrap'
-                                                                                        }}
-                                                                                    >
-                                                                                        {taskPoints} pts
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-
-                                                                            <div
-                                                                                className="task-card-bottom"
-                                                                                style={{
-                                                                                    display: 'flex',
-                                                                                    justifyContent: 'space-between',
-                                                                                    alignItems: 'center',
-                                                                                    marginTop: 'auto',
-                                                                                    paddingRight: showNotAcceptBtn ? '32px' : '0'
-                                                                                }}
-                                                                            >
-                                                                                <div className="task-card-meta" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                    <span className={`priority-tag priority-${task.priority?.toLowerCase()}`}>
-                                                                                        {task.priority || 'Medium'}
-                                                                                    </span>
-                                                                                </div>
-
-                                                                                {assignees.length > 0 && (
-                                                                                    <div className="task-assignees-group" style={{ marginLeft: 'auto', display: 'flex', gap: '-4px' }}>
-                                                                                        {assignees.map((assignee, aIdx) => {
-                                                                                            const userInfo = getUserInfo(assignee, projectMembers);
-                                                                                            const name = getMemberDisplayName(userInfo);
-                                                                                            const assigneeId = typeof assignee === 'object'
-                                                                                                ? (assignee._id || assignee.id || aIdx)
-                                                                                                : assignee;
-
-                                                                                            return (
-                                                                                                <div
-                                                                                                    key={assigneeId}
-                                                                                                    className="task-assignee-avatar"
-                                                                                                    title={name}
-                                                                                                    style={{
-                                                                                                        marginLeft: aIdx > 0 ? '-6px' : '0',
-                                                                                                        border: '2px solid #ffffff',
-                                                                                                        borderRadius: '50%'
-                                                                                                    }}
-                                                                                                >
-                                                                                                    {getInitials(name)}
-                                                                                                </div>
-                                                                                            );
-                                                                                        })}
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-
-                                                                            {showNotAcceptBtn && (
-                                                                                <button
-                                                                                    type="button"
-                                                                                    title="Not Accept Task"
-                                                                                    onClick={(e) => handleLeaderDecisionOnTask(e, task, column._id, false)}
-                                                                                    style={{
-                                                                                        position: 'absolute',
-                                                                                        right: '10px',
-                                                                                        top: '50%',
-                                                                                        transform: 'translateY(-50%)',
-                                                                                        backgroundColor: '#dc2626',
-                                                                                        color: '#ffffff',
-                                                                                        border: 'none',
-                                                                                        borderRadius: '50%',
-                                                                                        width: '24px',
-                                                                                        height: '24px',
-                                                                                        cursor: 'pointer',
-                                                                                        display: 'flex',
-                                                                                        alignItems: 'center',
-                                                                                        justifyContent: 'center',
-                                                                                        transition: 'background-color 0.2s',
-                                                                                        zIndex: 2
-                                                                                    }}
-                                                                                >
-                                                                                    <X size={14} strokeWidth={3} />
-                                                                                </button>
-                                                                            )}
-                                                                        </div>
+                                                                        <TaskCard
+                                                                            task={task}
+                                                                            dragRef={provided.innerRef}
+                                                                            draggableProps={provided.draggableProps}
+                                                                            dragHandleProps={provided.dragHandleProps}
+                                                                            isDragging={snapshot.isDragging}
+                                                                            canDrag={canDragThisTask}
+                                                                            week={displayWeek}
+                                                                            points={taskPoints}
+                                                                            deadlineStatus={status}
+                                                                            assignees={assigneeList}
+                                                                            onOpen={() => handleOpenTaskDrawer(task._id || task.id)}
+                                                                            onNotAccept={showNotAcceptBtn ? (e) => handleLeaderDecisionOnTask(e, task, column._id, false) : undefined}
+                                                                        />
                                                                     )}
                                                                 </Draggable>
                                                             );

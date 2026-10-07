@@ -477,47 +477,127 @@ button.panel-row:hover { background-color: var(--color-surface-hover); }
   box-shadow: var(--shadow-lg);
   rotate: 1.5deg;
 }
-.task-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.task-card-drag-handle {
-  flex-shrink: 0;
-  padding: 2px;
-  border-radius: 4px;
-  color: var(--color-text-subtle);
-  cursor: grab;
+.task-card:active:not(.is-dragging) { background-color: var(--color-bg); }
+.task-card.is-locked .priority-tag { opacity: 0.9; }
+
+/* card content (pages/Project/board/TaskCard.jsx)
+   priority → title → description → meta (week · points · checklist) → deadline signal + avatars + actions */
+.task-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 20px;
 }
-.task-card-drag-handle:hover { background-color: var(--color-surface-hover); }
 .task-card-title {
-  font-size: 13px;
+  margin: 0;
+  font-size: var(--text-base);
   font-weight: 500;
   line-height: 1.4;
+  color: var(--color-text);
+  /* long titles wrap; very long ones stop at 3 lines (full title: aria-label + drawer) */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.task-card-desc {
+  margin-top: calc(-1 * var(--space-1));
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--color-text-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
 }
-.task-card-labels { display: flex; flex-wrap: wrap; gap: var(--space-1); }
-.label-chip {
-  display: inline-flex;
+.task-card-meta {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  padding: 2px 7px;
-  border-radius: var(--radius-sm);
-  font-size: 10.5px;
-  font-weight: 500;
+  gap: var(--space-1) var(--space-3);
+  list-style: none;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
 }
-.task-card-sub-meta { display: flex; align-items: center; gap: var(--space-3); font-size: 12px; color: var(--color-text-muted); }
-.task-card-sub-meta .icon-inline { display: inline-flex; align-items: center; gap: 4px; }
-.task-card-sub-meta .icon-inline.complete { color: var(--color-success); }
-.task-card-bottom {
+.task-card-meta li { display: inline-flex; align-items: center; gap: var(--space-1); white-space: nowrap; }
+.task-card-meta .icon { color: var(--color-text-subtle); }
+.task-card-meta li.is-complete,
+.task-card-meta li.is-complete .icon { color: var(--color-success); }
+.task-card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 2px;
-  margin-top: 12px;
-  gap: 8px;
+  gap: var(--space-2);
+  min-height: 24px;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-surface-hover);
 }
-.task-card-due { font-size: 12px; font-weight: 500; color: var(--color-text-subtle); }
-.task-card-due.due-overdue { color: var(--color-danger); }
-.task-card-due.due-today { color: var(--color-warning); }
+.task-card-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  min-width: 0;
+}
+/* deadline: shown only for Overdue / Expiring — color is the signal */
+.task-card-signal {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 20px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.task-card-signal.is-overdue { color: var(--color-danger); background-color: var(--color-danger-bg); }
+.task-card-signal.is-expiring { color: var(--color-priority-medium-text); background-color: var(--color-warning-bg); }
+.task-card .avatar-group .avatar,
+.task-card .avatar-group .avatar-overflow { margin-left: -3px; border-width: 2px; letter-spacing: -0.02em; }
+.task-card .avatar-group > :first-child { margin-left: 0; }
+
+/* "Not accept" (leader/manager, Done column) */
+.task-card-reject {
+  position: relative;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+.task-card-reject:hover:not(:disabled),
+.task-card-reject:focus-visible {
+  color: var(--color-danger);
+  border-color: var(--color-danger-border);
+  background-color: var(--color-danger-bg);
+}
+.task-card-reject:active:not(:disabled) { background-color: var(--color-danger-border); }
+.task-card-reject:disabled { opacity: .5; cursor: not-allowed; }
+
+/* lightweight tooltip for icon buttons: <button data-tooltip="…" aria-label="…"> (hover + keyboard focus) */
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-slate-900);
+  color: var(--color-on-primary);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease;
+  z-index: var(--z-dropdown);
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after { opacity: 1; transform: translateY(0); }
 
 /* Inline "Add Task" control at the bottom of a column */
 .add-task-btn {
