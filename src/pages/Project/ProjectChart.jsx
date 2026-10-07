@@ -348,7 +348,7 @@ export default function ProjectChartPage() {
                             {/* SECTION 1: 2 Biểu đồ cột nằm trên 1 hàng */}
                             <div style={{
                                 display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))',
                                 gap: '24px',
                                 width: '100%'
                             }}>

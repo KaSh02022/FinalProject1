@@ -51,6 +51,14 @@ export const fetchProjects = async () => {
     return handleResponse(res);
 };
 
+// Workspace statistics for the Dashboard KPI ({ totalProjects, totalBudget, onTimeRate })
+export const fetchPortfolio = async () => {
+    const res = await fetch(`${API_BASE_URL}/project/portfolio`, {
+        headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+};
+
 export const fetchProjectById = async (id) => {
     const res = await fetch(`${API_BASE_URL}/project/${id}`, {
         headers: getAuthHeaders()

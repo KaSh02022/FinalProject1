@@ -1,11 +1,4 @@
 import KPI from "./KPI/KPI";
-import RecentActivity from "./OverViews/RecentActivity";
-import TaskCompletion from "./OverViews/TaskCompletion";
-import TeamWorkload from "./OverViews/TeamWorkload";
-import ProjectStatus from "./ProjectProgress/ProjectStatus";
-import ProjectProgress from "./ProjectProgress/ProjectStatus";
-import TodayTask from "./ProjectProgress/TodayTask";
-import UCMDeadlines from "./ProjectProgress/UCMDeadlines";
 
 // Name of the signed-in user as stored by the login page ("" when unknown — never a made-up name)
 const getStoredUserName = () => {
@@ -17,27 +10,22 @@ const getStoredUserName = () => {
     }
 };
 
-function Dashboard(){
+// Only widgets backed by a real API are rendered. TodayTask, UCMDeadlines, RecentActivity, TaskCompletion,
+// TeamWorkload and ProjectStatus contain static sample data and have no endpoint — they stay hidden
+// (files kept in ./OverViews and ./ProjectProgress until real data exists).
+function Dashboard() {
     const userName = getStoredUserName();
-    return(
-        <>
-    <main className="page-content">
-        <div className="page-content-inner stack">
-          <div>
-            <h1>{userName ? `Welcome back, ${userName}` : "Welcome back"}</h1>
-            <p className="page-subtitle">Here's what's happening across your workspace today.</p>
-          </div>
+    return (
+        <main className="page-content">
+            <div className="page-content-inner stack dashboard-page">
+                <div>
+                    <h1>{userName ? `Welcome back, ${userName}` : "Welcome back"}</h1>
+                    <p className="page-subtitle">Here's what's happening across your workspace today.</p>
+                </div>
 
-        <KPI/>
-         <div className="grid-3">
-            
-         </div>
-        <div className="grid-3">
-          </div>    
-        </div>
-      </main>
-        </>
-    )
+                <KPI />
+            </div>
+        </main>
+    );
 }
 export default Dashboard;
-

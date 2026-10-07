@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import ErrorState from '../../components/common/ErrorState.jsx';
 import { useConfirm } from '../../components/common/confirmContext.js';
+import Modal from '../../components/common/Modal.jsx';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 
 import {
@@ -11,8 +12,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Trash2,
-    StickyNote,
-    X } from 'lucide-react';
+    StickyNote } from 'lucide-react';
 
 import {
     fetchProjectById,
@@ -471,7 +471,7 @@ export default function ProjectCalendar() {
                         />
 
                         {/* Main Content: Calendar */}
-                        <main className="page-content" style={{ padding: '20px' }}>
+                        <main className="page-content">
                             {partialFailure && (
                                 <ErrorState
                                     variant="inline"
@@ -481,35 +481,33 @@ export default function ProjectCalendar() {
                                 />
                             )}
                             {/* Navigation Toolbar */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                                <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a' }}>
+                            <div className="calendar-toolbar">
+                                <h2 className="calendar-month">
                                     {`${MONTH_NAMES[month]} ${year}`}
                                 </h2>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <div style={{ display: 'flex', gap: '4px' }}>
-                                        <button onClick={handlePrevMonth} className="btn btn-secondary btn-sm" style={{ padding: '6px' }}>
-                                            <ChevronLeft className="w-4 h-4" />
-                                        </button>
-                                        <button onClick={handleToday} className="btn btn-secondary btn-sm" style={{ padding: '4px 10px', fontSize: '13px' }}>
-                                            Month
-                                        </button>
-                                        <button onClick={handleNextMonth} className="btn btn-secondary btn-sm" style={{ padding: '6px' }}>
-                                            <ChevronRight className="w-4 h-4" />
-                                        </button>
-                                    </div>
+                                <div className="calendar-toolbar-actions">
+                                    <button type="button" onClick={handlePrevMonth} className="btn btn-secondary btn-sm btn-icon-sm" aria-label="Previous month">
+                                        <ChevronLeft className="icon icon-sm" aria-hidden="true" />
+                                    </button>
+                                    <button type="button" onClick={handleToday} className="btn btn-secondary btn-sm">
+                                        Month
+                                    </button>
+                                    <button type="button" onClick={handleNextMonth} className="btn btn-secondary btn-sm btn-icon-sm" aria-label="Next month">
+                                        <ChevronRight className="icon icon-sm" aria-hidden="true" />
+                                    </button>
                                 </div>
                             </div>
 
                             {/* Calendar Grid */}
-                            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'center', fontWeight: 600, fontSize: '13px', color: '#64748b' }}>
+                            <div className="calendar-card">
+                                <div className="calendar-weekdays">
                                     {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((dayName) => (
-                                        <div key={dayName} style={{ padding: '10px 0' }}>{dayName}</div>
+                                        <div key={dayName}>{dayName}</div>
                                     ))}
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridAutoRows: 'minmax(120px, auto)', gap: '1px', background: '#e2e8f0' }}>
+                                <div className="calendar-days">
                                     {calendarGrid.map((cell, idx) => {
                                         const dateStr = formatDateToLocalString(cell.date);
                                         const dayTasks = tasksByDate[dateStr] || [];
@@ -521,29 +519,10 @@ export default function ProjectCalendar() {
                                             <div
                                                 key={idx}
                                                 onClick={() => canCreateTask && handleOpenCreateModal(dateStr)}
-                                                style={{
-                                                    background: cell.isCurrentMonth ? '#fff' : '#f8fafc',
-                                                    padding: '8px',
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    gap: '4px',
-                                                    cursor: canCreateTask ? 'pointer' : 'default',
-                                                    position: 'relative'
-                                                }}
+                                                className={`calendar-cell${cell.isCurrentMonth ? '' : ' is-outside'}`}
                                             >
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                                    <span style={{
-                                                        fontSize: '12px',
-                                                        fontWeight: isToday ? 700 : 500,
-                                                        color: isToday ? '#fff' : (cell.isCurrentMonth ? '#1e293b' : '#94a3b8'),
-                                                        background: isToday ? '#4f46e5' : 'transparent',
-                                                        borderRadius: '50%',
-                                                        width: '22px',
-                                                        height: '22px',
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center'
-                                                    }}>
+                                                <div className="calendar-cell-head">
+                                                    <span className={`calendar-day-num${isToday ? ' is-today' : ''}`} aria-current={isToday ? 'date' : undefined}>
                                                         {cell.date.getDate()}
                                                     </span>
 
@@ -553,26 +532,15 @@ export default function ProjectCalendar() {
                                                             type="button"
                                                             onClick={(e) => handleOpenNoteModal(dateStr, e)}
                                                             title="Add note"
-                                                            style={{
-                                                                border: 'none',
-                                                                background: '#e0e7ff',
-                                                                color: '#4f46e5',
-                                                                borderRadius: '4px',
-                                                                width: '20px',
-                                                                height: '20px',
-                                                                cursor: 'pointer',
-                                                                display: 'inline-flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                padding: 0
-                                                            }}
+                                                            aria-label={`Add note on ${dateStr}`}
+                                                            className="calendar-add-note"
                                                         >
-                                                            <Plus size={13} />
+                                                            <Plus size={13} aria-hidden="true" />
                                                         </button>
                                                     )}
                                                 </div>
 
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto', maxHeight: '90px' }}>
+                                                <div className="calendar-cell-items">
                                                     {/* HIỂN THỊ NOTES NẾU CÓ */}
                                                     {dayNotes.map(note => {
                                                         const noteId = note._id || note.id;
@@ -680,47 +648,29 @@ export default function ProjectCalendar() {
 
                         {/* MODAL TẠO NOTE KHI BẤM DẤU CỘNG */}
                         {canManageNote && activeModal === 'createNoteModal' && (
-                            <div style={{
-                                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                                background: 'rgba(15, 23, 42, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-                            }}>
-                                <div style={{ background: '#fff', borderRadius: '8px', padding: '20px', width: '380px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                                        <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a' }}>Add note ({selectedNoteDate})</h3>
-                                        <button onClick={() => setActiveModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
-                                            <X size={18} />
-                                        </button>
-                                    </div>
-                                    <form onSubmit={handleCreateNoteSubmit}>
+                            <Modal title={`Add note (${selectedNoteDate})`} size="sm" onClose={() => setActiveModal(null)}>
+                                <form className="modal-form" onSubmit={handleCreateNoteSubmit}>
+                                    <div className="modal-body">
                                         <textarea
+                                            className="textarea note-textarea"
+                                            aria-label="Note content"
                                             value={noteContent}
                                             onChange={(e) => setNoteContent(e.target.value)}
                                             placeholder="Nhập nội dung ghi chú..."
                                             rows={3}
                                             required
-                                            autoFocus
-                                            style={{
-                                                width: '100%',
-                                                padding: '8px 12px',
-                                                borderRadius: '6px',
-                                                border: '1px solid #cbd5e1',
-                                                outline: 'none',
-                                                resize: 'none',
-                                                fontSize: '14px',
-                                                boxSizing: 'border-box'
-                                            }}
                                         />
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '14px' }}>
-                                            <button type="button" onClick={() => setActiveModal(null)} className="btn btn-secondary btn-sm" style={{ padding: '6px 12px', fontSize: '13px' }}>
-                                                Hủy
-                                            </button>
-                                            <button type="submit" disabled={isSubmittingNote} className="btn btn-primary btn-sm" style={{ background: '#4f46e5', color: '#fff', padding: '6px 14px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                                {isSubmittingNote ? <Loader2 className="animate-spin" size={14} /> : 'Lưu ghi chú'}
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button type="button" onClick={() => setActiveModal(null)} className="btn btn-secondary btn-sm">
+                                            Hủy
+                                        </button>
+                                        <button type="submit" disabled={isSubmittingNote} className="btn btn-primary btn-sm">
+                                            {isSubmittingNote ? <Loader2 className="animate-spin" size={14} aria-label="Saving" /> : 'Lưu ghi chú'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </Modal>
                         )}
                     </>
                 )}

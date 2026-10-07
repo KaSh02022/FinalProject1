@@ -24,6 +24,7 @@ import { API_BASE_URL } from "../../config/apiConfig.js";
 import "./project.css";
 import ErrorState from '../../components/common/ErrorState.jsx';
 import { useConfirm } from '../../components/common/confirmContext.js';
+import Modal from '../../components/common/Modal.jsx';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 import {
     Plus,
@@ -1266,49 +1267,12 @@ export default function ProjectBoard({ projectId: propProjectId }) {
             />
 
             {canCreateTask && activeModal === 'quickCreateTaskModal' && (
-                <div className="modal-overlay" onClick={closeModal}>
-                    <div
-                        className="modal-box"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                            maxHeight: '90vh',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            overflowY: 'auto',
-                            padding: '24px',
-                            boxSizing: 'border-box',
-                            width: '100%',
-                            maxWidth: '520px'
-                        }}
-                    >
-                        <form
-                            onSubmit={handleCreateTask}
-                            style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                flex: 1,
-                                overflow: 'hidden'
-                            }}
-                        >
-                            <div className="modal-header" style={{ flexShrink: 0 }}>
-                                <h2>Add Task</h2>
-                                <button type="button" className="btn-icon" onClick={closeModal} style={{ cursor: 'pointer' }}>✕</button>
-                            </div>
-
-                            <div
-                                className="modal-body"
-                                style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '16px',
-                                    overflowY: 'auto',
-                                    paddingRight: '4px',
-                                    flex: 1
-                                }}
-                            >
+                <Modal title="Add Task" onClose={closeModal}>
+                        <form className="modal-form" onSubmit={handleCreateTask}>
+                            <div className="modal-body">
                                 <div className="form-group">
-                                    <label className="form-label">Title *</label>
-                                    <input
+                                    <label className="form-label" htmlFor="board-task-title">Title *</label>
+                                    <input id="board-task-title"
                                         className="input"
                                         placeholder="e.g: My task title"
                                         value={newTaskTitle}
@@ -1317,17 +1281,12 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Column *</label>
-                                    <select
+                                    <label className="form-label" htmlFor="board-task-column">Column *</label>
+                                    <select id="board-task-column"
                                         className="select"
                                         value={newTaskColumnId}
                                         onChange={(e) => setNewTaskColumnId(e.target.value)}
                                         disabled={isColumnFixed}
-                                        style={{
-                                            backgroundColor: isColumnFixed ? '#f1f5f9' : '#ffffff',
-                                            cursor: isColumnFixed ? 'not-allowed' : 'pointer',
-                                            opacity: isColumnFixed ? 0.8 : 1
-                                        }}
                                         required
                                     >
                                         {columns.map((col) => (
@@ -1337,8 +1296,8 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label">Points</label>
-                                    <input
+                                    <label className="form-label" htmlFor="board-task-points">Points</label>
+                                    <input id="board-task-points"
                                         type="number"
                                         min="0"
                                         className="input"
@@ -1349,12 +1308,11 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label">Week</label>
-                                    <select
+                                    <label className="form-label" htmlFor="board-task-week">Week</label>
+                                    <select id="board-task-week"
                                         className="select"
                                         value={newTaskWeek}
                                         onChange={(e) => setNewTaskWeek(Number(e.target.value))}
-                                        style={{ cursor: 'pointer' }}
                                     >
                                         {Array.from({ length: totalProjectWeeks }, (_, i) => i + 1).map(w => (
                                             <option key={w} value={w}>Week {w}</option>
@@ -1363,12 +1321,11 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label">Priority</label>
-                                    <select
+                                    <label className="form-label" htmlFor="board-task-priority">Priority</label>
+                                    <select id="board-task-priority"
                                         className="select"
                                         value={newTaskPriority}
                                         onChange={(e) => setNewTaskPriority(e.target.value)}
-                                        style={{ cursor: 'pointer' }}
                                     >
                                         <option value="Low">Low</option>
                                         <option value="Medium">Medium</option>
@@ -1378,8 +1335,8 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label">Description</label>
-                                    <textarea
+                                    <label className="form-label" htmlFor="board-task-description">Description</label>
+                                    <textarea id="board-task-description"
                                         className="textarea"
                                         value={newTaskDesc}
                                         onChange={(e) => setNewTaskDesc(e.target.value)}
@@ -1387,12 +1344,12 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                                 </div>
                             </div>
 
-                            <div className="modal-footer" style={{ flexShrink: 0, marginTop: '16px' }}>
-                                <button type="button" className="btn btn-secondary" onClick={closeModal} style={{ cursor: 'pointer' }}>Cancel</button>
-                                <button type="submit" className="btn btn-primary" disabled={isSubmitting} style={{ cursor: isSubmitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
+                                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                                     {isSubmitting ? (
                                         <>
-                                            <Loader2 className="animate-spin" size={16} />
+                                            <Loader2 className="animate-spin" size={16} aria-hidden="true" />
                                             <span>Adding...</span>
                                         </>
                                     ) : (
@@ -1401,8 +1358,7 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                                 </button>
                             </div>
                         </form>
-                    </div>
-                </div>
+                </Modal>
             )}
         </>
     );

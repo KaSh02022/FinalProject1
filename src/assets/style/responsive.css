@@ -143,6 +143,13 @@
   .toast-viewport.app-toasts { left: var(--space-4); right: var(--space-4); bottom: var(--space-4); max-width: none; }
   .app-toasts .toast { width: 100%; min-width: 0; }
   .confirm-footer .btn { flex: 1; }
+  .form-modal .modal-header, .form-modal .modal-body, .form-modal .modal-footer { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .form-modal .grid-2 { grid-template-columns: 1fr; }
+  /* Calendar on phones: compact cells, number above the "+" so 7 columns fit */
+  .calendar-days { grid-auto-rows: minmax(88px, auto); }
+  .calendar-cell { padding: var(--space-1); }
+  .calendar-cell-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .settings-field-grid { grid-template-columns: 1fr; }
   .task-drawer .drawer-body { padding: var(--space-4); }
   .task-drawer .drawer-header { padding: var(--space-3) var(--space-4); }
   .drawer-field-grid { grid-template-columns: 1fr; }

@@ -3,7 +3,6 @@ import "./project.css";
 
 import {
     Plus,
-    X,
     ListChecks,
     UsersRound,
     CalendarClock,
@@ -21,6 +20,8 @@ import { Link } from "react-router-dom";
 import ErrorState from '../../components/common/ErrorState.jsx';
 import { failureMessage } from '../../utils/requestState.js';
 import { avatarToneClass } from "../../utils/avatar.js";
+import { notify } from "../../utils/notify.js";
+import Modal from '../../components/common/Modal.jsx';
 
 const COLOR_OPTIONS = [
     '#4f46e5',
@@ -118,7 +119,6 @@ export default function Projects() {
     const [taskPriority, setTaskPriority] = useState('Medium');
     const [taskDueDate, setTaskDueDate] = useState('');
 
-    const [toasts, setToasts] = useState([]);
 
     const getCurrentUser = () => {
         try {
@@ -239,7 +239,7 @@ export default function Projects() {
         } catch (error) {
             console.error("Lỗi fetch projects:", error);
             setProjectsError(error);
-            showToast('Lỗi', 'Không thể tải danh sách Projects.', 'error');
+            // the page shows ErrorState + Retry for this failure (no extra toast)
         } finally {
             setLoadingProjects(false);
         }
@@ -278,12 +278,9 @@ export default function Projects() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
+    // the page's toasts were kept in state but never rendered: they now go to the shared notifier
     const showToast = (title, description = null, variant = 'info') => {
-        const id = Date.now();
-        setToasts((prev) => [...prev, { id, title, description, variant }]);
-        setTimeout(() => {
-            setToasts((prev) => prev.filter((t) => t.id !== id));
-        }, 4000);
+        notify({ type: variant, title, message: description || '' });
     };
 
     // null = not known (still loading or the request failed)
@@ -578,19 +575,12 @@ export default function Projects() {
 
             {/* Modal Create Task */}
             {activeModal === 'quickCreateTaskModal' && (
-                <div className="modal-overlay" onClick={() => setActiveModal(null)}>
-                    <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">Create task</h2>
-                            <button className="icon-btn" onClick={() => setActiveModal(null)} aria-label="Close" style={{ cursor: 'pointer' }}>
-                                <X className="icon" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleCreateTask}>
-                            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                <Modal title="Create task" onClose={() => setActiveModal(null)}>
+                        <form className="modal-form" onSubmit={handleCreateTask}>
+                            <div className="modal-body">
                                 <div className="field">
-                                    <label className="field-label">Title</label>
-                                    <input
+                                    <label className="field-label" htmlFor="quick-task-title">Title</label>
+                                    <input id="quick-task-title"
                                         className="input"
                                         placeholder="e.g. Fix pagination bug"
                                         required
@@ -601,8 +591,8 @@ export default function Projects() {
                                 </div>
                                 <div className="grid-2">
                                     <div className="field">
-                                        <label className="field-label">Project</label>
-                                        <select className="select" value={taskProject} onChange={(e) => setTaskProject(e.target.value)}>
+                                        <label className="field-label" htmlFor="quick-task-project">Project</label>
+                                        <select id="quick-task-project" className="select" value={taskProject} onChange={(e) => setTaskProject(e.target.value)}>
                                             {projects.map((p) => (
                                                 <option key={p._id || p.id} value={p._id || p.id}>
                                                     {p.name}
@@ -611,8 +601,8 @@ export default function Projects() {
                                         </select>
                                     </div>
                                     <div className="field">
-                                        <label className="field-label">Column</label>
-                                        <select className="select" value={taskColumn} onChange={(e) => setTaskColumn(e.target.value)}>
+                                        <label className="field-label" htmlFor="quick-task-column">Column</label>
+                                        <select id="quick-task-column" className="select" value={taskColumn} onChange={(e) => setTaskColumn(e.target.value)}>
                                             <option value="Todo">Todo</option>
                                             <option value="In Progress">In Progress</option>
                                             <option value="Review">Review</option>
@@ -622,8 +612,8 @@ export default function Projects() {
                                 </div>
                                 <div className="grid-2">
                                     <div className="field">
-                                        <label className="field-label">Priority</label>
-                                        <select className="select" value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)}>
+                                        <label className="field-label" htmlFor="quick-task-priority">Priority</label>
+                                        <select id="quick-task-priority" className="select" value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)}>
                                             <option value="Medium">Medium</option>
                                             <option value="Urgent">Urgent</option>
                                             <option value="High">High</option>
@@ -631,8 +621,8 @@ export default function Projects() {
                                         </select>
                                     </div>
                                     <div className="field">
-                                        <label className="field-label">End date</label>
-                                        <input
+                                        <label className="field-label" htmlFor="quick-task-end-date">End date</label>
+                                        <input id="quick-task-end-date"
                                             className="input"
                                             type="date"
                                             min={getTodayString()}
@@ -652,13 +642,13 @@ export default function Projects() {
                                 </div>
                             </div>
                             <div className="modal-footer">
-                                <button type="button" className="btn btn-outline btn-sm" onClick={() => setActiveModal(null)} style={{ cursor: 'pointer' }}>
+                                <button type="button" className="btn btn-outline btn-sm" onClick={() => setActiveModal(null)}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary btn-sm" disabled={isSubmittingTask} style={{ cursor: isSubmittingTask ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <button type="submit" className="btn btn-primary btn-sm" disabled={isSubmittingTask}>
                                     {isSubmittingTask ? (
                                         <>
-                                            <Loader2 className="animate-spin" size={14} />
+                                            <Loader2 className="animate-spin" size={14} aria-hidden="true" />
                                             <span>Creating...</span>
                                         </>
                                     ) : (
@@ -667,58 +657,17 @@ export default function Projects() {
                                 </button>
                             </div>
                         </form>
-                    </div>
-                </div>
+                </Modal>
             )}
 
             {/* Modal Create Project */}
             {canCreateProject && activeModal === 'createProjectModal' && (
-                <div className="modal-overlay" onClick={closeModal}>
-                    <div
-                        className="modal-box"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                            width: '100%',
-                            maxWidth: '640px',
-                            maxHeight: '85vh',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            overflow: 'hidden'
-                        }}
-                    >
-                        <div className="modal-header" style={{ flexShrink: 0, padding: '20px 24px 16px' }}>
-                            <div>
-                                <h2 className="modal-title">Create project</h2>
-                                <p className="modal-desc">Set up a new board for your team.</p>
-                            </div>
-                            <button className="icon-btn" onClick={closeModal} aria-label="Close" style={{ cursor: 'pointer' }}>
-                                <X className="icon" />
-                            </button>
-                        </div>
-
-                        <form
-                            onSubmit={handleCreateProject}
-                            style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                flex: 1,
-                                overflow: 'hidden'
-                            }}
-                        >
-                            <div
-                                className="modal-body"
-                                style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 'var(--space-4)',
-                                    overflowY: 'auto',
-                                    padding: '0 24px 8px',
-                                    flex: 1
-                                }}
-                            >
+                <Modal title="Create project" description="Set up a new board for your team." size="lg" onClose={closeModal}>
+                        <form className="modal-form" onSubmit={handleCreateProject}>
+                            <div className="modal-body">
                                 <div className="field">
-                                    <label className="field-label">Name</label>
-                                    <input
+                                    <label className="field-label" htmlFor="new-project-name">Name</label>
+                                    <input id="new-project-name"
                                         className="input"
                                         placeholder="e.g. Growth Experiments"
                                         required
@@ -728,8 +677,8 @@ export default function Projects() {
                                     />
                                 </div>
                                 <div className="field">
-                                    <label className="field-label">Description</label>
-                                    <input
+                                    <label className="field-label" htmlFor="new-project-description">Description</label>
+                                    <input id="new-project-description"
                                         className="textarea"
                                         placeholder="What is this project about?"
                                         value={projectDesc}
@@ -739,8 +688,8 @@ export default function Projects() {
 
                                 <div className="grid-2">
                                     <div className="field">
-                                        <label className="field-label">Start date</label>
-                                        <input
+                                        <label className="field-label" htmlFor="new-project-start-date">Start date</label>
+                                        <input id="new-project-start-date"
                                             className="input"
                                             type="date"
                                             min={getTodayString()}
@@ -758,8 +707,8 @@ export default function Projects() {
                                         />
                                     </div>
                                     <div className="field">
-                                        <label className="field-label">End date</label>
-                                        <input
+                                        <label className="field-label" htmlFor="new-project-end-date">End date</label>
+                                        <input id="new-project-end-date"
                                             className="input"
                                             type="date"
                                             min={projectStartDate || getTodayString()}
@@ -779,37 +728,31 @@ export default function Projects() {
                                 </div>
 
                                 <div className="field">
-                                    <span className="field-label">Color</span>
-                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                    <span className="field-label" id="new-project-color">Color</span>
+                                    <div className="color-swatches" role="group" aria-labelledby="new-project-color">
                                         {COLOR_OPTIONS.map((color) => (
                                             <button
                                                 key={color}
                                                 type="button"
-                                                aria-label="Color"
+                                                aria-label={`Color ${color}`}
+                                                aria-pressed={selectedColor === color}
                                                 onClick={() => setSelectedColor(color)}
-                                                style={{
-                                                    width: '24px',
-                                                    height: '24px',
-                                                    borderRadius: '50%',
-                                                    background: color,
-                                                    border: 'none',
-                                                    cursor: 'pointer',
-                                                    boxShadow: selectedColor === color ? `0 0 0 2px #fff, 0 0 0 4px ${color}` : 'none'
-                                                }}
+                                                className={`color-swatch${selectedColor === color ? ' is-selected' : ''}`}
+                                                style={{ '--swatch': color }}
                                             />
                                         ))}
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="modal-footer" style={{ flexShrink: 0, padding: '16px 24px 20px' }}>
-                                <button type="button" className="btn btn-outline btn-sm" onClick={closeModal} style={{ cursor: 'pointer' }}>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-outline btn-sm" onClick={closeModal}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary btn-sm" disabled={isSubmittingProject} style={{ cursor: isSubmittingProject ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <button type="submit" className="btn btn-primary btn-sm" disabled={isSubmittingProject}>
                                     {isSubmittingProject ? (
                                         <>
-                                            <Loader2 className="animate-spin" size={14} />
+                                            <Loader2 className="animate-spin" size={14} aria-hidden="true" />
                                             <span>Creating...</span>
                                         </>
                                     ) : (
@@ -818,8 +761,7 @@ export default function Projects() {
                                 </button>
                             </div>
                         </form>
-                    </div>
-                </div>
+                </Modal>
             )}
         </>
     );

@@ -316,6 +316,7 @@ export default function ProjectOverview() {
                                 <input
                                     type="file"
                                     multiple
+                                    aria-label="Choose files to upload"
                                     className="input"
                                     style={{ flex: '1', padding: '8px' }}
                                     onChange={(e) => setSelectedFiles(e.target.files)}

@@ -22,6 +22,7 @@ import {
 import { API_BASE_URL } from "../../config/apiConfig.js";
 
 import ProjectHeader from '../../components/project/ProjectHeader.jsx';
+import Modal from '../../components/common/Modal.jsx';
 
 // Helper function format ngày dạng DD/MM/YYYY
 const formatDate = (dateString, fallback = 'Chưa đặt') => {
@@ -358,8 +359,8 @@ export default function ProjectList() {
                                 )}
                             </div>
 
-                            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'visible' }}>
-                                <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', fontSize: '14px' }}>
+                            <div className="backlog-table-wrap">
+                                <table className="backlog-table">
                                     <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontWeight: 600 }}>
                                     <tr>
                                         <th style={{ padding: '12px 16px' }}>Title</th>
@@ -471,17 +472,12 @@ export default function ProjectList() {
 
             {/* CREATE TASK MODAL */}
             {isManager && activeModal === 'quickCreateTaskModal' && (
-                <div className="modal-overlay" onClick={closeModal}>
-                    <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-                        <form onSubmit={handleCreateTask}>
-                            <div className="modal-header">
-                                <h2>Add Task to Backlog</h2>
-                                <button type="button" className="btn-icon" onClick={closeModal}>✕</button>
-                            </div>
+                <Modal title="Add Task to Backlog" onClose={closeModal}>
+                        <form className="modal-form" onSubmit={handleCreateTask}>
                             <div className="modal-body">
                                 <div className="form-group">
-                                    <label className="form-label">Title *</label>
-                                    <input
+                                    <label className="form-label" htmlFor="backlog-task-title">Title *</label>
+                                    <input id="backlog-task-title"
                                         className="input"
                                         placeholder="e.g: My task"
                                         value={newTaskTitle}
@@ -491,8 +487,8 @@ export default function ProjectList() {
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label">Points</label>
-                                    <input
+                                    <label className="form-label" htmlFor="backlog-task-points">Points</label>
+                                    <input id="backlog-task-points"
                                         type="number"
                                         min="0"
                                         className="input"
@@ -503,12 +499,11 @@ export default function ProjectList() {
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label">Week</label>
-                                    <select
+                                    <label className="form-label" htmlFor="backlog-task-week">Week</label>
+                                    <select id="backlog-task-week"
                                         className="select"
                                         value={newTaskWeek}
                                         onChange={(e) => setNewTaskWeek(Number(e.target.value))}
-                                        style={{ cursor: 'pointer' }}
                                     >
                                         {Array.from({ length: totalProjectWeeks }, (_, i) => i + 1).map(w => (
                                             <option key={w} value={w}>Week {w}</option>
@@ -517,8 +512,8 @@ export default function ProjectList() {
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label">Priority</label>
-                                    <select
+                                    <label className="form-label" htmlFor="backlog-task-priority">Priority</label>
+                                    <select id="backlog-task-priority"
                                         className="select"
                                         value={newTaskPriority}
                                         onChange={(e) => setNewTaskPriority(e.target.value)}
@@ -531,8 +526,8 @@ export default function ProjectList() {
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label">Description</label>
-                                    <textarea
+                                    <label className="form-label" htmlFor="backlog-task-description">Description</label>
+                                    <textarea id="backlog-task-description"
                                         className="textarea"
                                         placeholder="Add task description..."
                                         value={newTaskDesc}
@@ -548,8 +543,7 @@ export default function ProjectList() {
                                 </button>
                             </div>
                         </form>
-                    </div>
-                </div>
+                </Modal>
             )}
         </>
     );

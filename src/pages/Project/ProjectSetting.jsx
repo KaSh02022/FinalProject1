@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import ErrorState from '../../components/common/ErrorState.jsx';
 import { useConfirm } from '../../components/common/confirmContext.js';
 import { notify } from '../../utils/notify.js';
+import Modal from '../../components/common/Modal.jsx';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 
 import {
@@ -11,7 +12,6 @@ import {
     Loader2,
     Search,
     UserPlus,
-    X,
     MoreHorizontal,
     UserCog
     } from 'lucide-react';
@@ -543,8 +543,8 @@ export default function ProjectSetting() {
                                         <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: 'var(--space-4)' }}>General Settings</h2>
                                         <form onSubmit={handleSaveGeneralSettings} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                                             <div className="field">
-                                                <label className="field-label">Project name</label>
-                                                <input
+                                                <label className="field-label" htmlFor="settings-project-name">Project name</label>
+                                                <input id="settings-project-name"
                                                     type="text"
                                                     className="input"
                                                     value={formData.name}
@@ -556,8 +556,8 @@ export default function ProjectSetting() {
                                             </div>
 
                                             <div className="field">
-                                                <label className="field-label">Description</label>
-                                                <input
+                                                <label className="field-label" htmlFor="settings-description">Description</label>
+                                                <input id="settings-description"
                                                     className="textarea"
                                                     value={formData.description}
                                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -566,10 +566,10 @@ export default function ProjectSetting() {
                                                 />
                                             </div>
 
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-4)' }}>
+                                            <div className="settings-field-grid">
                                                 <div className="field">
-                                                    <label className="field-label">Color</label>
-                                                    <input
+                                                    <label className="field-label" htmlFor="settings-color">Color</label>
+                                                    <input id="settings-color"
                                                         type="color"
                                                         style={{
                                                             height: '38px',
@@ -586,8 +586,8 @@ export default function ProjectSetting() {
                                                     />
                                                 </div>
                                                 <div className="field">
-                                                    <label className="field-label">Start date (DD/MM/YYYY)</label>
-                                                    <input
+                                                    <label className="field-label" htmlFor="settings-start-date">Start date (DD/MM/YYYY)</label>
+                                                    <input id="settings-start-date"
                                                         type="date"
                                                         className="input"
                                                         min={getTodayString()}
@@ -607,8 +607,8 @@ export default function ProjectSetting() {
                                                     />
                                                 </div>
                                                 <div className="field">
-                                                    <label className="field-label">End date (DD/MM/YYYY)</label>
-                                                    <input
+                                                    <label className="field-label" htmlFor="settings-end-date">End date (DD/MM/YYYY)</label>
+                                                    <input id="settings-end-date"
                                                         type="date"
                                                         className="input"
                                                         min={formData.startDate || getTodayString()}
@@ -866,21 +866,11 @@ export default function ProjectSetting() {
 
             {/* Modal Invite Member */}
             {openInviteModal && (
-                <div className="modal-overlay" id="inviteMemberModal" onClick={() => setOpenInviteModal(false)}>
-                    <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <div>
-                                <h2 className="modal-title">Invite a member</h2>
-                                <p className="modal-desc">Add a new person to this project.</p>
-                            </div>
-                            <button onClick={() => setOpenInviteModal(false)} className="icon-btn" aria-label="Close" style={{ cursor: 'pointer' }}>
-                                <X size={18} />
-                            </button>
-                        </div>
-                        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                <Modal title="Invite a member" description="Add a new person to this project." size="sm" onClose={() => setOpenInviteModal(false)}>
+                        <div className="modal-body">
                             <div className="field">
-                                <label className="field-label">Email *</label>
-                                <input
+                                <label className="field-label" htmlFor="invite-email">Email *</label>
+                                <input id="invite-email"
                                     value={inviteEmail}
                                     onChange={(e) => setInviteEmail(e.target.value)}
                                     className="input"
@@ -891,8 +881,8 @@ export default function ProjectSetting() {
                             </div>
 
                             <div className="field">
-                                <label className="field-label">Role</label>
-                                <select
+                                <label className="field-label" htmlFor="invite-role">Role</label>
+                                <select id="invite-role"
                                     value={inviteRole}
                                     onChange={(e) => setInviteRole(e.target.value)}
                                     className="select"
@@ -902,12 +892,13 @@ export default function ProjectSetting() {
                                     <option value="Manager">Manager</option>
                                 </select>
                             </div>
-                            <button className="btn btn-primary" style={{ alignSelf: 'flex-start', cursor: 'pointer' }} onClick={handleInvite}>
+                        </div>
+                        <div className="modal-footer">
+                            <button type="button" className="btn btn-primary" onClick={handleInvite}>
                                 Add Member
                             </button>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             )}
         </>
     );

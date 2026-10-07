@@ -4,10 +4,10 @@ import { updateUserStatus } from "../../../api";
 import { API_BASE_URL } from "../../config/apiConfig.js";
 import ErrorState from "../../components/common/ErrorState.jsx";
 import { failureMessage } from "../../utils/requestState.js";
+import { notify } from "../../utils/notify.js";
 
 function AdminUsers() {
     const [users, setUsers] = useState([]);
-    const [showToats, setShowToast] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedRole, setSelectedRole] = useState("All");
     // User list request failed: show the error, not an empty list. Bump reloadKey to retry.
@@ -58,10 +58,11 @@ function AdminUsers() {
                 prev.map((u) => (u._id === userId ? { ...u, status: newStatus } : u))
             );
 
-            setShowToast(true);
-            setTimeout(() => setShowToast(false), 1500);
+            notify({ type: "success", title: "Changed successfully" });
         } catch (err) {
             console.error("Lỗi cập nhật trạng thái:", err);
+            // was console-only: the switch looked like it worked
+            notify({ type: "error", title: "Couldn't change the account status", message: err.message });
         }
     };
 
@@ -94,11 +95,13 @@ function AdminUsers() {
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="input"
                                 placeholder="Search by name or email…"
+                                aria-label="Search users by name or email"
                                 data-filter-input="adminUsers"
                             />
                         </div>
                         <select
                             onChange={(e) => setSelectedRole(e.target.value)}
+                            aria-label="Filter by role"
                             className="select"
                             style={{ width: "auto", minWidth: "150px" }}
                         >
@@ -171,32 +174,6 @@ function AdminUsers() {
                 </div>
             </main>
 
-            {showToats && (
-                <div className="toast-viewport">
-                    <div className="toast variant-success">
-            <span className="toast-icon icon" data-icon="checkCircle2">
-              <svg viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="m16 9-5.5 5.5L8 12"></path>
-              </svg>
-            </span>
-                        <div className="toast-body">
-                            <p className="toast-title">Changed successfully</p>
-                        </div>
-                        <button
-                            className="toast-close icon icon-sm"
-                            onClick={() => setShowToast(false)}
-                            data-icon="x"
-                            aria-label="Dismiss"
-                        >
-                            <svg viewBox="0 0 24 24">
-                                <path d="M18 6 6 18"></path>
-                                <path d="m6 6 12 12"></path>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            )}
         </>
     );
 }
