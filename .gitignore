@@ -30,3 +30,7 @@ qa-screenshots/
 .env
 .env.*
 !.env.example
+
+# Internal Markdown documentation
+*.md
+!README.md
