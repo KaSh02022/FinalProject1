@@ -112,6 +112,10 @@
   .header-search { display: none; }
 
   .grid-4, .grid-3, .grid-2, .grid-stats, .grid-cards { grid-template-columns: 1fr; }
+  .burndown-card { padding: var(--space-4); }
+  .burndown-project { width: 100%; }
+  .burndown-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .burndown-chart { height: 280px; }
 
   .page-content { padding: var(--space-4); }
   .page-content-inner { padding: var(--space-4); }

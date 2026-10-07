@@ -180,6 +180,15 @@ export const fetchMyTasks = async () => {
     return handleResponse(res);
 };
 
+// Epic Burndown of one project. The body is the chart itself — { totalPoints, currentWeek, weeks } —
+// with no { success, data } wrapper (see src/utils/epicBurndown.js)
+export const fetchEpicBurndown = async (projectId) => {
+    const res = await fetch(`${API_BASE_URL}/task/project/${encodeURIComponent(projectId)}/epic-burndown`, {
+        headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+};
+
 export const fetchTaskById = async (taskId) => {
     const res = await fetch(`${API_BASE_URL}/task/${taskId}`, {
         headers: getAuthHeaders()
