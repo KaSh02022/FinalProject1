@@ -93,7 +93,9 @@ export default function Projects() {
     const [projects, setProjects] = useState([]);
     const [members, setMembers] = useState([]);
 
+    // per project: { status: 'loading' | 'success' | 'error', total, done } — a failed count is shown as "—", never 0
     const [projectTaskStats, setProjectTaskStats] = useState({});
+    const [retryingStats, setRetryingStats] = useState(false);
     const [projectMembersMap, setProjectMembersMap] = useState({});
 
     const [loadingProjects, setLoadingProjects] = useState(true);
@@ -158,6 +160,44 @@ export default function Projects() {
         resetProjectForm();
     };
 
+    // Task count + done count of one project (same request and "done" rule as before)
+    const loadTaskStats = async (pId) => {
+        try {
+            const tasksData = await fetchTasksByProject(pId);
+            const tasksList = Array.isArray(tasksData) ? tasksData : (tasksData?.data || []);
+
+            const doneTasksCount = tasksList.filter((task) => {
+                if (task.columnId && typeof task.columnId === 'object') {
+                    return task.columnId.position === 3;
+                }
+                if (task.position === 3) {
+                    return true;
+                }
+                return false;
+            }).length;
+
+            return { status: 'success', total: tasksList.length, done: doneTasksCount };
+        } catch (err) {
+            console.error("Lỗi fetch tasks của project:", pId, err);
+            return { status: 'error', error: err };
+        }
+    };
+
+    // Retry only the projects whose count failed; their cards show a spinner meanwhile
+    const retryFailedStats = async () => {
+        const failedIds = Object.keys(projectTaskStats).filter((id) => projectTaskStats[id]?.status === 'error');
+        if (failedIds.length === 0) return;
+        setRetryingStats(true);
+        setProjectTaskStats((prev) => {
+            const next = { ...prev };
+            failedIds.forEach((id) => { next[id] = { status: 'loading' }; });
+            return next;
+        });
+        const results = await Promise.all(failedIds.map(async (id) => [id, await loadTaskStats(id)]));
+        setProjectTaskStats((prev) => ({ ...prev, ...Object.fromEntries(results) }));
+        setRetryingStats(false);
+    };
+
     const loadProjects = async () => {
         setLoadingProjects(true);
         setProjectsError(null);
@@ -177,27 +217,7 @@ export default function Projects() {
                 list.map(async (project) => {
                     const pId = project._id || project.id;
 
-                    try {
-                        const tasksData = await fetchTasksByProject(pId);
-                        const tasksList = Array.isArray(tasksData) ? tasksData : (tasksData?.data || []);
-
-                        const doneTasksCount = tasksList.filter((task) => {
-                            if (task.columnId && typeof task.columnId === 'object') {
-                                return task.columnId.position === 3;
-                            }
-                            if (task.position === 3) {
-                                return true;
-                            }
-                            return false;
-                        }).length;
-
-                        statsMap[pId] = {
-                            total: tasksList.length,
-                            done: doneTasksCount
-                        };
-                    } catch (err) {
-                        statsMap[pId] = { total: 0, done: 0 };
-                    }
+                    statsMap[pId] = await loadTaskStats(pId);
 
                     try {
                         const projectMembersData = await fetchMembersByProject(pId);
@@ -266,11 +286,13 @@ export default function Projects() {
         }, 4000);
     };
 
+    // null = not known (still loading or the request failed)
     const calculateProgress = (project) => {
         const pId = project._id || project.id;
         const stats = projectTaskStats[pId];
+        if (stats?.status !== 'success') return null;
 
-        if (stats && stats.total > 0) {
+        if (stats.total > 0) {
             return Math.round((stats.done / stats.total) * 100);
         }
 
@@ -279,11 +301,11 @@ export default function Projects() {
 
     const getTaskCount = (project) => {
         const pId = project._id || project.id;
-        if (projectTaskStats[pId] !== undefined) {
-            return projectTaskStats[pId].total;
-        }
-        return 0;
+        const stats = projectTaskStats[pId];
+        return stats?.status === 'success' ? stats.total : null;
     };
+
+    const failedStatsCount = Object.values(projectTaskStats).filter((st) => st?.status === 'error').length;
 
     const handleCreateProject = async (e) => {
         e.preventDefault();
@@ -373,7 +395,7 @@ export default function Projects() {
         <>
 
                 <main className="page-content">
-                    <div className="page-content-inner">
+                    <div className="page-content-inner projects-page">
                         <div className="page-header">
                             <div>
                                 <h1>Projects</h1>
@@ -415,12 +437,24 @@ export default function Projects() {
                                 </p>
                             </div>
                         ) : (
+                            <>
+                            {failedStatsCount > 0 && (
+                                <ErrorState
+                                    variant="inline"
+                                    title="Couldn't load task counts."
+                                    message={`${failedStatsCount} ${failedStatsCount === 1 ? 'project shows' : 'projects show'} “—” instead of a number.`}
+                                    onRetry={retryFailedStats}
+                                    retrying={retryingStats}
+                                />
+                            )}
                             <div className="grid-cards">
                                 {projects.map((project) => {
                                     const pId = project._id || project.id;
                                     const memberList = projectMembersMap[pId] || [];
+                                    const statsStatus = projectTaskStats[pId]?.status || 'loading';
                                     const totalTask = getTaskCount(project);
-                                    const progressPercent = calculateProgress(project);
+                                    const progressValue = calculateProgress(project);
+                                    const progressPercent = progressValue ?? 0;
                                     const statusObj = getProjectStatus(project.date || project.dueDate);
 
                                     return (
@@ -444,12 +478,25 @@ export default function Projects() {
                                             <p className="project-card-desc">{project.description || project.desc}</p>
                                             <div>
                                                 <div className="project-card-progress-row">
-                                                    <span className="icon-inline">
-                                                        <ListChecks className="icon icon-sm" />
-                                                        {totalTask} {totalTask === 1 ? 'task' : 'tasks'}
-                                                    </span>
+                                                    {statsStatus === 'success' ? (
+                                                        <span className="icon-inline">
+                                                            <ListChecks className="icon icon-sm" />
+                                                            {totalTask} {totalTask === 1 ? 'task' : 'tasks'}
+                                                        </span>
+                                                    ) : statsStatus === 'error' ? (
+                                                        <span className="icon-inline project-stats-error" title="Couldn't load the task count">
+                                                            <ListChecks className="icon icon-sm" />
+                                                            <span aria-hidden="true">—</span>
+                                                            <span className="sr-only">Task count unavailable</span>
+                                                        </span>
+                                                    ) : (
+                                                        <span className="icon-inline project-stats-loading" role="status">
+                                                            <Loader2 className="icon icon-sm animate-spin" aria-hidden="true" />
+                                                            <span className="sr-only">Loading task count</span>
+                                                        </span>
+                                                    )}
                                                     <span style={{ fontWeight: 700, color: '#0f172a' }}>
-                                                        {progressPercent}%
+                                                        {progressValue === null ? '—' : `${progressPercent}%`}
                                                     </span>
                                                 </div>
 
@@ -524,6 +571,7 @@ export default function Projects() {
                                     );
                                 })}
                             </div>
+                            </>
                         )}
                     </div>
                 </main>

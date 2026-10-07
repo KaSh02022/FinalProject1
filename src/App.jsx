@@ -18,6 +18,9 @@ import ForgetPassword from './pages/ForgetPassword/ForgetPassword.jsx'
 import ResetPassword from './pages/ForgetPassword/ResetPassword/ResetPassword.jsx'
 import ProjectOverview from "./pages/Project/ProjectOverview.jsx";
 import ProjectChart from "./pages/Project/ProjectChart.jsx";
+import ConfirmProvider from "./components/common/ConfirmProvider.jsx";
+import Notifier from "./components/common/Notifier.jsx";
+import { notify } from "./utils/notify.js";
 
 function App() {
     const navigate = useNavigate();
@@ -31,7 +34,7 @@ function App() {
 
             // Nếu user đăng nhập trùng khớp với userId bị ban
             if (currentUserId && currentUserId === data.userId) {
-                alert("Tài khoản của bạn đã bị vô hiệu hóa bởi Quản trị viên.");
+                notify({ type: "error", title: "Tài khoản của bạn đã bị vô hiệu hóa bởi Quản trị viên." });
 
                 // Xóa thông tin đăng nhập
                 localStorage.removeItem("user");
@@ -50,7 +53,7 @@ function App() {
     }, [navigate]);
 
     return (
-        <>
+        <ConfirmProvider>
             <Routes>
                 <Route index element={<Login/>}/>
                 {/* Signed-in pages share one shell (sidebar + header). Paths are unchanged. */}
@@ -71,7 +74,8 @@ function App() {
                 <Route path = "/forgot" element={<ForgetPassword/>}/>
                 <Route path = "/resetPassword" element={<ResetPassword/>}/>
             </Routes>
-        </>
+            <Notifier/>
+        </ConfirmProvider>
     )
 }
 

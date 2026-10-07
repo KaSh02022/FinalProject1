@@ -140,6 +140,9 @@
   .admin-user-joined { display: none; }
 
   .drawer-panel, .drawer-panel.task-drawer { width: 100%; max-width: 100%; height: 100dvh; }
+  .toast-viewport.app-toasts { left: var(--space-4); right: var(--space-4); bottom: var(--space-4); max-width: none; }
+  .app-toasts .toast { width: 100%; min-width: 0; }
+  .confirm-footer .btn { flex: 1; }
   .task-drawer .drawer-body { padding: var(--space-4); }
   .task-drawer .drawer-header { padding: var(--space-3) var(--space-4); }
   .drawer-field-grid { grid-template-columns: 1fr; }
@@ -165,6 +168,9 @@
    Fine details: hide the Ctrl K hint and the "Create" label text.
    ========================================================= */
 @media (max-width: 639px) {
+  /* My Tasks: the 5 filter tabs fit the phone width (they ran 14px past the edge) */
+  .my-tasks-page .pill-tabs { display: flex; width: 100%; max-width: 100%; overflow-x: auto; }
+  .my-tasks-page .pill-tab { flex: 1 1 auto; padding: var(--space-2) 6px; text-align: center; white-space: nowrap; }
   .header-search kbd { display: none; }
   .create-btn-label { display: none; }
 }

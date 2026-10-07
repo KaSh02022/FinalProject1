@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import ErrorState from '../../components/common/ErrorState.jsx';
+import { useConfirm } from '../../components/common/confirmContext.js';
+import { notify } from '../../utils/notify.js';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 import {
     fetchProjectById,
@@ -47,6 +49,7 @@ export default function ProjectOverview() {
     const [project, setProject] = useState(null);
     const [projectMembers, setProjectMembers] = useState([]);
     const [tasks, setTasks] = useState([]);
+    const confirm = useConfirm();
     const [loading, setLoading] = useState(true);
     // Requests that failed in the last load; bump reloadKey to retry
     const [loadFailures, setLoadFailures] = useState([]);
@@ -142,7 +145,7 @@ export default function ProjectOverview() {
             setIsEditingDetail(false);
         } catch (error) {
             console.error("Failed to update project details:", error);
-            alert(error.message || "Failed to update project details.");
+            notify({ type: "error", title: "Failed to update project details.", message: error.message });
         } finally {
             setIsSavingDetail(false);
         }
@@ -154,12 +157,12 @@ export default function ProjectOverview() {
 
         // Chặn người dùng nếu không phải Manager hoặc Admin
         if (!isManager) {
-            alert("Bạn cần có quyền Manager hoặc Admin để thực hiện thao tác này!");
+            notify({ type: "error", title: "Bạn cần có quyền Manager hoặc Admin để thực hiện thao tác này!" });
             return;
         }
 
         if (!selectedFiles || selectedFiles.length === 0) {
-            alert("Please select at least one file to upload!");
+            notify({ type: "info", title: "Please select at least one file to upload!" });
             return;
         }
 
@@ -181,7 +184,7 @@ export default function ProjectOverview() {
             }
         } catch (error) {
             console.error("File upload error:", error);
-            alert(error.message || "An error occurred while uploading files!");
+            notify({ type: "error", title: "An error occurred while uploading files!", message: error.message });
         } finally {
             setIsUploading(false);
         }
@@ -189,18 +192,25 @@ export default function ProjectOverview() {
 
     // Delete project document
     const handleDeleteDocument = async (docId) => {
-        if (!window.confirm("Are you sure you want to delete this document?")) return;
-        try {
-            const res = await deleteProjectDocument(projectId, docId);
-            if (res?.documents) {
-                setDocuments(res.documents);
-            } else {
-                setDocuments(prev => prev.filter(d => String(d._id) !== String(docId)));
-            }
-        } catch (error) {
-            console.error("Failed to delete document:", error);
-            alert(error.message || "An error occurred while deleting the document.");
-        }
+        // the dialog stays open until the request finishes; a failure is shown inside it (was an alert)
+        await confirm({
+            title: "Delete document?",
+            message: "Are you sure you want to delete this document?",
+            tone: "danger",
+            onConfirm: async () => {
+                try {
+                    const res = await deleteProjectDocument(projectId, docId);
+                    if (res?.documents) {
+                        setDocuments(res.documents);
+                    } else {
+                        setDocuments(prev => prev.filter(d => String(d._id) !== String(docId)));
+                    }
+                } catch (error) {
+                    console.error("Failed to delete document:", error);
+                    throw new Error(error.message || "An error occurred while deleting the document.");
+                }
+            },
+        });
     };
 
     if (loading) {

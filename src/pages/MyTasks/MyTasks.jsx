@@ -11,10 +11,11 @@ import {
     fetchTaskActivities,
     fetchColumnsByProject,
     fetchMembersByProject,
-    fetchProjectById
+    fetchProjectById,
+    fetchMyTasks
 } from "./../../../api.jsx";
-import { API_BASE_URL } from "../../config/apiConfig.js";
-import { Loader2 } from "lucide-react";
+import { CheckSquare, ClipboardList, Loader2, Search } from "lucide-react";
+import { useConfirm } from "../../components/common/confirmContext.js";
 import ErrorState from "../../components/common/ErrorState.jsx";
 import { failureMessage } from "../../utils/requestState.js";
 import TaskDrawerFrame from "../../components/task/TaskDrawerFrame.jsx";
@@ -137,6 +138,7 @@ function TaskDrawer({
     const [reloadKey, setReloadKey] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState('');
+    const confirm = useConfirm();
 
     const [comments, setComments] = useState([]);
     const [commentsError, setCommentsError] = useState('');
@@ -343,15 +345,23 @@ function TaskDrawer({
 
     const handleDeleteTask = async () => {
         if (!canDelete) return;
-        if (!window.confirm("Bạn có chắc chắn muốn xóa công việc này?")) return;
-        try {
-            await deleteTask(taskId);
-            if (onTaskDeleted) onTaskDeleted(taskId);
-            handleCloseDrawer();
-        } catch (error) {
-            console.error("Lỗi khi xóa task:", error);
-            setSaveError(`Couldn't delete the task — ${error.message}`);
-        }
+        // the dialog stays open (loading) until the request finishes and shows the API error if it fails
+        await confirm({
+            title: "Xóa công việc?",
+            message: "Bạn có chắc chắn muốn xóa công việc này?",
+            tone: "danger",
+            onConfirm: async () => {
+                try {
+                    await deleteTask(taskId);
+                    if (onTaskDeleted) onTaskDeleted(taskId);
+                    handleCloseDrawer();
+                } catch (error) {
+                    console.error("Lỗi khi xóa task:", error);
+                    setSaveError(`Couldn't delete the task — ${error.message}`);
+                    throw error;
+                }
+            },
+        });
     };
 
     // Checklist / comment actions return promises: the shared sections show progress and errors
@@ -604,7 +614,7 @@ function MyTasks() {
     const [tasks, setTasks] = useState([]);
     const [projectMap, setProjectMap] = useState({});
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
+    const [error, setError] = useState(null);
     const [searchQuery, setSearchQuery] = useState("");
 
     const [selectedTaskId, setSelectedTaskId] = useState(null);
@@ -663,21 +673,9 @@ function MyTasks() {
     const loadMyTasks = async () => {
         try {
             setLoading(true);
-            setError("");
+            setError(null);
 
-            const token = localStorage.getItem("token");
-            const res = await fetch(`${API_BASE_URL}/task/my-task`, {
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-
-            if (!res.ok) {
-                throw new Error(`HTTP error: ${res.status}`);
-            }
-
-            const data = await res.json();
+            const data = await fetchMyTasks();
             const realTasks = Array.isArray(data) ? data : (data?.data || []);
             setTasks(realTasks);
 
@@ -687,19 +685,14 @@ function MyTasks() {
                     .filter(Boolean)
             ));
 
+            // project details only add names / start dates: a failed one is skipped, as before
             const projFetchPromises = uniqueProjIds.map(async (pId) => {
                 try {
-                    const resProj = await fetch(`${API_BASE_URL}/project/${pId}`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    if (resProj.ok) {
-                        const pData = await resProj.json();
-                        return { id: pId, data: pData?.data || pData };
-                    }
+                    const pData = await fetchProjectById(pId);
+                    return { id: pId, data: pData?.data || pData };
                 } catch {
                     return null;
                 }
-                return null;
             });
 
             const fetchedProjects = await Promise.all(projFetchPromises);
@@ -713,7 +706,7 @@ function MyTasks() {
 
         } catch (err) {
             console.error("Lỗi lấy My Tasks:", err);
-            setError("Không thể tải danh sách công việc.");
+            setError(err);
             setTasks([]);
         } finally {
             setLoading(false);
@@ -789,49 +782,62 @@ function MyTasks() {
     return (
         <>
             <main className="page-content">
-                <div className="page-content-inner stack" style={{ gap: 'var(--space-4)' }}>
+                <div className="page-content-inner stack my-tasks-page">
                     <div>
                         <h1>My Tasks</h1>
                         <p className="page-subtitle">Everything assigned to you across all projects.</p>
                     </div>
 
-                    <div className="filter-bar" style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
-                        <div className="input-icon-wrap" style={{ flex: 1 }}>
+                    <div className="filter-bar my-tasks-filter">
+                        <div className="input-icon-wrap my-tasks-search" role="search">
+                            <Search className="icon icon-sm" aria-hidden="true" />
                             <input
                                 className="input"
+                                type="search"
                                 placeholder="Search tasks by title..."
+                                aria-label="Search my tasks by title"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
                         </div>
                     </div>
 
-                    <div className="pill-tabs">
+                    <div className="pill-tabs" role="group" aria-label="Filter my tasks">
                         <button
+                            type="button"
+                            aria-pressed={activeTab === "all"}
                             className={`pill-tab ${activeTab === "all" ? "active" : ""}`}
                             onClick={() => setActiveTab('all')}
                         >
                             All
                         </button>
                         <button
+                            type="button"
+                            aria-pressed={activeTab === "upcoming"}
                             className={`pill-tab ${activeTab === "upcoming" ? "active" : ""}`}
                             onClick={() => setActiveTab('upcoming')}
                         >
                             Upcoming
                         </button>
                         <button
+                            type="button"
+                            aria-pressed={activeTab === "expiring"}
                             className={`pill-tab ${activeTab === "expiring" ? "active" : ""}`}
                             onClick={() => setActiveTab('expiring')}
                         >
                             Expiring
                         </button>
                         <button
+                            type="button"
+                            aria-pressed={activeTab === "overdue"}
                             className={`pill-tab ${activeTab === "overdue" ? "active" : ""}`}
                             onClick={() => setActiveTab('overdue')}
                         >
                             Overdue
                         </button>
                         <button
+                            type="button"
+                            aria-pressed={activeTab === "completed"}
                             className={`pill-tab ${activeTab === "completed" ? "active" : ""}`}
                             onClick={() => setActiveTab('completed')}
                         >
@@ -840,7 +846,7 @@ function MyTasks() {
                     </div>
 
                     {!loading && !error && filteredTasks.length > 0 && (
-                        <div className="card">
+                        <div className="card my-tasks-list">
                             {filteredTasks.map((task) => {
                                 const totalChecklist = task.checklist?.length || 0;
                                 const completedChecklist = task.checklist?.filter(i => i.completed)?.length || 0;
@@ -858,17 +864,17 @@ function MyTasks() {
 
                                 return (
                                     <button
+                                        type="button"
                                         key={task._id}
-                                        className="task-list-row"
+                                        className="task-list-row my-tasks-row"
                                         onClick={() => handleOpenDrawer(task._id)}
-                                        style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}
                                     >
                                         <div className="task-list-title-cell">
                                             <div className="task-list-title-top">
                                                 <span className="priority-badge">
                                                     {task.priority || "Medium"}
                                                 </span>
-                                                <span className="task-title-text" style={{ fontWeight: 500 }}>
+                                                <span className="task-title-text">
                                                     {task.title || task.name}
                                                 </span>
                                             </div>
@@ -879,27 +885,20 @@ function MyTasks() {
                                                 </span>
 
                                                 <span className="task-list-sub-meta">
-                                                    <span className="icon icon-xs">☑</span>
+                                                    <CheckSquare className="icon icon-xs" aria-hidden="true" />
                                                     {completedChecklist}/{totalChecklist}
                                                 </span>
                                             </div>
                                         </div>
 
-                                        <span className="task-list-column-cell" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span className="task-list-column-cell">
                                             <span
                                                 className="project-color-dot"
                                                 style={{ background: (typeof task.projectId === 'object' && task.projectId?.color) || "#94a3b8" }}
                                             ></span>
                                             <span>{statusName}</span>
 
-                                            <span style={{
-                                                fontSize: '11px',
-                                                padding: '2px 6px',
-                                                borderRadius: '4px',
-                                                background: '#f3f4f6',
-                                                color: '#4b5563',
-                                                fontWeight: 500
-                                            }}>
+                                            <span className="my-tasks-week" title={`Week ${weekNum}`}>
                                                 W{weekNum}
                                             </span>
                                         </span>
@@ -922,28 +921,39 @@ function MyTasks() {
                     )}
 
                     {loading && (
-                        <div className="card">
-                            <div className="empty-state" style={{ padding: '32px 0', textAlign: 'center' }}>
-                                <p className="empty-state-title">Loading tasks...</p>
-                            </div>
+                        <div className="card my-tasks-state" role="status">
+                            <Loader2 className="icon animate-spin" aria-hidden="true" />
+                            <span>Loading tasks...</span>
                         </div>
                     )}
 
                     {!loading && error && (
-                        <div className="card">
-                            <div className="empty-state" style={{ padding: '32px 0', textAlign: 'center' }}>
-                                <p className="empty-state-title">{error}</p>
-                            </div>
-                        </div>
+                        <ErrorState
+                            title="Couldn't load your tasks"
+                            message={failureMessage({ error })}
+                            onRetry={loadMyTasks}
+                        />
                     )}
 
                     {!loading && !error && filteredTasks.length === 0 && (
                         <div className="card">
-                            <div className="empty-state" style={{ padding: '32px 0', textAlign: 'center' }}>
-                                <p className="empty-state-title">No tasks found</p>
-                                <p className="empty-state-desc">
-                                    Nothing matches this view right now.
-                                </p>
+                            <div className="empty-state my-tasks-empty">
+                                <span className="empty-state-icon" aria-hidden="true">
+                                    <ClipboardList className="icon" />
+                                </span>
+                                {tasks.length === 0 ? (
+                                    <>
+                                        <p className="empty-state-title">No tasks assigned to you</p>
+                                        <p className="empty-state-desc">Tasks assigned to you in any project will show up here.</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="empty-state-title">No tasks found</p>
+                                        <p className="empty-state-desc">
+                                            Nothing matches this view right now.
+                                        </p>
+                                    </>
+                                )}
                             </div>
                         </div>
                     )}

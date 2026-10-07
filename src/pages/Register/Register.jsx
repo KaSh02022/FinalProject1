@@ -2,6 +2,7 @@ import { Target, Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../config/apiConfig.js";
+import { notify } from "../../utils/notify.js";
 
 function Register() {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ function Register() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
-      alert("Mật khẩu xác nhận không khớp!");
+      notify({ type: "error", title: "Mật khẩu xác nhận không khớp!" });
       return;
     }
     try {
@@ -42,7 +43,7 @@ function Register() {
         // Đăng ký thành công -> Chuyển hướng sang trang Login
         navigate("/login");
       } else {
-        alert(data.message || "Đăng ký thất bại");
+        notify({ type: "error", title: "Đăng ký thất bại", message: data.message });
       }
     } catch (error) {
       console.log(error);

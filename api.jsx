@@ -1,4 +1,5 @@
 import { API_BASE_URL, getApiErrorMessage } from './src/config/apiConfig.js';
+import { queueNotice } from './src/utils/notify.js';
 
 // Hàm xử lý Response chung
 const handleResponse = async (res) => {
@@ -8,7 +9,8 @@ const handleResponse = async (res) => {
         if (data.message === 'ACCOUNT_SUSPENDED' || data.logout) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            alert('Tài khoản của bạn đã bị khóa bởi Quản trị viên!');
+            // the page reloads right after: show the message on /login instead of a blocking alert
+            queueNotice({ type: 'error', title: 'Tài khoản của bạn đã bị khóa bởi Quản trị viên!' });
             window.location.href = '/login';
             throw new Error('Account banned');
         }
@@ -157,6 +159,14 @@ export const createQuickTask = async (taskData) => {
 
 export const fetchTasksByProject = async (projectId) => {
     const res = await fetch(`${API_BASE_URL}/task/project/${projectId}`, {
+        headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+};
+
+// Tasks assigned to the signed-in user, across all projects (My Tasks page)
+export const fetchMyTasks = async () => {
+    const res = await fetch(`${API_BASE_URL}/task/my-task`, {
         headers: getAuthHeaders()
     });
     return handleResponse(res);

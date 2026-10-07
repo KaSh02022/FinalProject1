@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ErrorState from '../../components/common/ErrorState.jsx';
+import { useConfirm } from '../../components/common/confirmContext.js';
+import { notify } from '../../utils/notify.js';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 
 import {
@@ -119,6 +121,7 @@ export default function ProjectSetting() {
     const [inviteRole, setInviteRole] = useState("Member");
 
     const [tasks, setTasks] = useState([]);
+    const confirm = useConfirm();
     const [columns, setColumns] = useState([]);
     const [loading, setLoading] = useState(true);
     // Requests that failed in the last load (empty = everything loaded)
@@ -289,21 +292,26 @@ export default function ProjectSetting() {
     };
 
     const handleDeleteMember = async (member) => {
-        if (!window.confirm("Bạn có chắc chắn muốn xóa thành viên này khỏi dự án?")) {
-            return;
-        }
+        await confirm({
+            title: "Xóa thành viên?",
+            message: "Bạn có chắc chắn muốn xóa thành viên này khỏi dự án?",
+            tone: "danger",
+            // same request and success handling; a failure is now shown in the dialog (was console only)
+            onConfirm: async () => {
+                try {
+                    await deleteMemberByProject(member._id);
 
-        try {
-            await deleteMemberByProject(member._id);
+                    setProjectMembers((prevMembers) =>
+                        prevMembers.filter((m) => m._id !== member._id)
+                    );
 
-            setProjectMembers((prevMembers) =>
-                prevMembers.filter((m) => m._id !== member._id)
-            );
-
-            setDropDown(null);
-        } catch (error) {
-            console.error("Lỗi xóa member:", error);
-        }
+                    setDropDown(null);
+                } catch (error) {
+                    console.error("Lỗi xóa member:", error);
+                    throw error;
+                }
+            },
+        });
     };
 
     const handleInvite = async () => {
@@ -379,18 +387,18 @@ export default function ProjectSetting() {
         const currentToday = getTodayString();
 
         if (formData.startDate && formData.startDate < currentToday) {
-            alert('Start date không được là ngày trong quá khứ!');
+            notify({ type: 'error', title: 'Start date không được là ngày trong quá khứ!' });
             return;
         }
 
         if (formData.dueDate && formData.dueDate < currentToday) {
-            alert('End date không được là ngày trong quá khứ!');
+            notify({ type: 'error', title: 'End date không được là ngày trong quá khứ!' });
             return;
         }
 
         if (formData.startDate && formData.dueDate) {
             if (formData.startDate > formData.dueDate) {
-                alert('Start date không thể sau End date!');
+                notify({ type: 'error', title: 'Start date không thể sau End date!' });
                 return;
             }
         }
@@ -428,14 +436,20 @@ export default function ProjectSetting() {
     const handleDeleteProject = async () => {
         if (!canDelete) return;
 
-        if (window.confirm('Bạn có chắc chắn muốn xóa dự án này không? Hành động này không thể hoàn tác.')) {
-            try {
-                await deleteProject(projectId);
-                navigate('/dashboard');
-            } catch (err) {
-                console.error('Lỗi khi xóa dự án:', err);
-            }
-        }
+        await confirm({
+            title: 'Xóa dự án?',
+            message: 'Bạn có chắc chắn muốn xóa dự án này không? Hành động này không thể hoàn tác.',
+            tone: 'danger',
+            onConfirm: async () => {
+                try {
+                    await deleteProject(projectId);
+                    navigate('/dashboard');
+                } catch (err) {
+                    console.error('Lỗi khi xóa dự án:', err);
+                    throw err;
+                }
+            },
+        });
     };
 
     // Định dạng hiển thị ngày trên Header theo chuẩn DD/MM/YYYY
@@ -582,7 +596,7 @@ export default function ProjectSetting() {
                                                             const val = e.target.value;
                                                             const currentToday = getTodayString();
                                                             if (val && val < currentToday) {
-                                                                alert('Start date không được là ngày trong quá khứ!');
+                                                                notify({ type: 'error', title: 'Start date không được là ngày trong quá khứ!' });
                                                                 setFormData({ ...formData, startDate: currentToday });
                                                             } else {
                                                                 setFormData({ ...formData, startDate: val });
@@ -603,7 +617,7 @@ export default function ProjectSetting() {
                                                             const val = e.target.value;
                                                             const minAllowed = formData.startDate || getTodayString();
                                                             if (val && val < minAllowed) {
-                                                                alert('End date không được nhỏ hơn Start date hoặc ngày hiện tại!');
+                                                                notify({ type: 'error', title: 'End date không được nhỏ hơn Start date hoặc ngày hiện tại!' });
                                                                 setFormData({ ...formData, dueDate: minAllowed });
                                                             } else {
                                                                 setFormData({ ...formData, dueDate: val });
@@ -772,6 +786,8 @@ export default function ProjectSetting() {
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => toggleDropdown(m._id)}
+                                                                            aria-label="Member actions"
+                                                                            aria-expanded={openDropdown === m._id}
                                                                             className="icon-btn icon-btn-sm"
                                                                             style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px' }}
                                                                         >

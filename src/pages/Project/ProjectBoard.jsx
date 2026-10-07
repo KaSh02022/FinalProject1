@@ -23,6 +23,7 @@ import {
 import { API_BASE_URL } from "../../config/apiConfig.js";
 import "./project.css";
 import ErrorState from '../../components/common/ErrorState.jsx';
+import { useConfirm } from '../../components/common/confirmContext.js';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 import {
     Plus,
@@ -194,6 +195,7 @@ function TaskDrawer({
     const [reloadKey, setReloadKey] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState('');
+    const confirm = useConfirm();
 
     const [comments, setComments] = useState([]);
     const [commentsError, setCommentsError] = useState('');
@@ -369,15 +371,23 @@ function TaskDrawer({
 
     const handleDeleteTask = async () => {
         if (!canDeleteTask) return;
-        if (!window.confirm("Bạn có chắc chắn muốn xóa task này?")) return;
-        try {
-            await deleteTask(taskId);
-            if (onTaskDeleted) onTaskDeleted(taskId);
-            handleCloseDrawer();
-        } catch (error) {
-            console.error("Lỗi khi xóa task:", error);
-            setSaveError(`Couldn't delete the task — ${error.message}`);
-        }
+        // the dialog stays open (loading) until the request finishes and shows the API error if it fails
+        await confirm({
+            title: "Xóa task?",
+            message: "Bạn có chắc chắn muốn xóa task này?",
+            tone: "danger",
+            onConfirm: async () => {
+                try {
+                    await deleteTask(taskId);
+                    if (onTaskDeleted) onTaskDeleted(taskId);
+                    handleCloseDrawer();
+                } catch (error) {
+                    console.error("Lỗi khi xóa task:", error);
+                    setSaveError(`Couldn't delete the task — ${error.message}`);
+                    throw error;
+                }
+            },
+        });
     };
 
     // Checklist / comment actions return promises: the shared sections show progress and errors
@@ -413,19 +423,26 @@ function TaskDrawer({
 
     const handleDeleteChecklist = async (item) => {
         if (!canDeleteChecklist) return;
-        if (!window.confirm("Bạn có chắc chắn muốn xóa checklist này?")) return;
 
-        const previousChecklist = task.checklist;
-        setTask(prev => ({ ...prev, checklist: (prev.checklist || []).filter(i => String(i._id) !== String(item._id)) }));
+        await confirm({
+            title: "Xóa checklist?",
+            message: "Bạn có chắc chắn muốn xóa checklist này?",
+            tone: "danger",
+            // same optimistic remove + rollback as before; the dialog shows the API error and stays open
+            onConfirm: async () => {
+                const previousChecklist = task.checklist;
+                setTask(prev => ({ ...prev, checklist: (prev.checklist || []).filter(i => String(i._id) !== String(item._id)) }));
 
-        try {
-            // see the BACKEND MISMATCH note on deleteChecklist in api.jsx — the item id is passed on purpose
-            await deleteChecklist(item._id);
-        } catch (error) {
-            console.error("Lỗi khi xóa checklist:", error);
-            setTask(prev => ({ ...prev, checklist: previousChecklist }));
-            throw error;
-        }
+                try {
+                    // see the BACKEND MISMATCH note on deleteChecklist in api.jsx — the item id is passed on purpose
+                    await deleteChecklist(item._id);
+                } catch (error) {
+                    console.error("Lỗi khi xóa checklist:", error);
+                    setTask(prev => ({ ...prev, checklist: previousChecklist }));
+                    throw error;
+                }
+            },
+        });
     };
 
     const handleAddComment = async (text) => {

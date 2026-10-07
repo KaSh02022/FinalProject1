@@ -2,6 +2,7 @@ import { useState } from "react";
 import { KanbanSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../../config/apiConfig.js";
+import { notify } from "../../../utils/notify.js";
 
 function ResetPassword() {
     const [newPassword, setNewPassword] = useState("");
@@ -19,7 +20,7 @@ function ResetPassword() {
 
         const savedEmail = localStorage.getItem("resetPasswordEmail");
         if (!savedEmail) {
-            alert("Phiên làm việc đã hết hạn. Vui lòng nhập lại email của bạn.");
+            notify({ type: "info", title: "Phiên làm việc đã hết hạn. Vui lòng nhập lại email của bạn." });
             navigate('/forgot'); 
             return;
         }
@@ -62,7 +63,7 @@ function ResetPassword() {
                 throw new Error(data.message || "Failed to reset password.");
             }
 
-            alert("Mật khẩu của bạn đã được thay đổi thành công!");
+            notify({ type: "success", title: "Mật khẩu của bạn đã được thay đổi thành công!" });
             
             localStorage.removeItem("resetPasswordEmail");
             navigate('/Login');

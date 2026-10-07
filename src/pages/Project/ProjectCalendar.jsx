@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import ErrorState from '../../components/common/ErrorState.jsx';
+import { useConfirm } from '../../components/common/confirmContext.js';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 
 import {
@@ -91,6 +92,7 @@ export default function ProjectCalendar() {
     const [projectMembers, setProjectMembers] = useState([]);
     const [memberCurrentRole, setMemberRole] = useState("");
     const [tasks, setTasks] = useState([]);
+    const confirm = useConfirm();
     const [notes, setNotes] = useState([]);
     const [loading, setLoading] = useState(true);
     // Requests that failed in the last load (empty = everything loaded)
@@ -269,15 +271,23 @@ export default function ProjectCalendar() {
     const handleDeleteTask = async (taskId, e) => {
         e.stopPropagation();
         if (!isManager) return;
-        if (!window.confirm('Are you sure you want to delete this task?')) return;
 
-        try {
-            setTasks(prev => prev.filter(t => String(t._id || t.id) !== String(taskId)));
-            await deleteTask(taskId);
-        } catch (err) {
-            console.error('Error deleting task:', err);
-            loadData();
-        }
+        await confirm({
+            title: 'Delete task?',
+            message: 'Are you sure you want to delete this task?',
+            tone: 'danger',
+            // same optimistic remove + reload on failure as before; the dialog also shows the error
+            onConfirm: async () => {
+                try {
+                    setTasks(prev => prev.filter(t => String(t._id || t.id) !== String(taskId)));
+                    await deleteTask(taskId);
+                } catch (err) {
+                    console.error('Error deleting task:', err);
+                    loadData();
+                    throw err;
+                }
+            },
+        });
     };
 
     // --- XỬ LÝ NOTE (KIỂM TRA QUYỀN canManageNote) ---
@@ -319,14 +329,22 @@ export default function ProjectCalendar() {
     const handleDeleteNote = async (noteId, e) => {
         e.stopPropagation();
         if (!canManageNote) return;
-        if (!window.confirm('Are you sure you want to delete this note?')) return;
-        try {
-            setNotes(prev => prev.filter(n => String(n._id || n.id) !== String(noteId)));
-            await deleteNote(noteId);
-        } catch (err) {
-            console.error('Error deleting note:', err);
-            loadData();
-        }
+
+        await confirm({
+            title: 'Delete note?',
+            message: 'Are you sure you want to delete this note?',
+            tone: 'danger',
+            onConfirm: async () => {
+                try {
+                    setNotes(prev => prev.filter(n => String(n._id || n.id) !== String(noteId)));
+                    await deleteNote(noteId);
+                } catch (err) {
+                    console.error('Error deleting note:', err);
+                    loadData();
+                    throw err;
+                }
+            },
+        });
     };
 
     // --- CALENDAR GRID COMPUTATION ---
@@ -593,11 +611,15 @@ export default function ProjectCalendar() {
 
                                                                 {/* NÚT XÓA NOTE: Chỉ hiển thị cho Admin, Leader, Manager */}
                                                                 {canManageNote && (
-                                                                    <Trash2
-                                                                        size={11}
-                                                                        style={{ cursor: 'pointer', flexShrink: 0, opacity: 0.8 }}
+                                                                    <button
+                                                                        type="button"
+                                                                        className="calendar-delete-btn"
+                                                                        aria-label="Delete note"
+                                                                        title="Delete note"
                                                                         onClick={(e) => handleDeleteNote(noteId, e)}
-                                                                    />
+                                                                    >
+                                                                        <Trash2 size={11} aria-hidden="true" />
+                                                                    </button>
                                                                 )}
                                                             </div>
                                                         );
@@ -635,11 +657,15 @@ export default function ProjectCalendar() {
                                                                     {task.title || 'Untitled'}
                                                                 </span>
                                                                 {isManager && (
-                                                                    <Trash2
-                                                                        size={12}
-                                                                        style={{ cursor: 'pointer', color: '#94a3b8' }}
+                                                                    <button
+                                                                        type="button"
+                                                                        className="calendar-delete-btn"
+                                                                        aria-label={`Delete task ${task.title || 'Untitled'}`}
+                                                                        title="Delete task"
                                                                         onClick={(e) => handleDeleteTask(taskId, e)}
-                                                                    />
+                                                                    >
+                                                                        <Trash2 size={12} aria-hidden="true" />
+                                                                    </button>
                                                                 )}
                                                             </div>
                                                         );
