@@ -6,10 +6,10 @@
 
 | Mục | Giá trị |
 |---|---|
-| Cập nhật lần cuối | 2026-10-06 |
-| Trạng thái hiện tại | **Phase A–E COMPLETED** (Phase E: 2026-10-07). Phase E đã chạy **backend thật** (bản sao local, DB QA riêng) — xem *Phase E › Backend Integration* |
-| Code đã sửa | Có — xem **Changed Files**. Git: baseline `a9ef6f4`, Phase A `4908de3`, Phase B `88caebf`, Phase C `a5701fe`, Phase D `1ace444`, Phase E `c2af4e2` |
-| Phase triển khai kế tiếp | Phase F — Projects / MyTasks / Filter consistency (**chờ user cho phép**) |
+| Cập nhật lần cuối | 2026-10-07 |
+| Trạng thái hiện tại | **Phase A–F COMPLETED** (Phase F: 2026-10-07). Phase E/F chạy **backend thật** (bản sao local, DB QA riêng) — xem *Phase E › Backend Integration* |
+| Code đã sửa | Có — xem **Changed Files**. Git: baseline `a9ef6f4`, Phase A `4908de3`, Phase B `88caebf`, Phase C `a5701fe`, Phase D `1ace444`, Phase E `c2af4e2`, Phase F `67844d1` |
+| Phase triển khai kế tiếp | Phase G — Dashboard (**chờ user cho phép**, xem *Phase F › Next Phase*) |
 
 ---
 
@@ -482,7 +482,7 @@ Một hệ breakpoint duy nhất (giữ theo `responsive.css`): **sm 640 · md 7
 | C | Project Header + Kanban Board | ✅ COMPLETED (2026-10-06) — phần cần dữ liệu thật: BLOCKED |
 | D | Task Card | ✅ COMPLETED (2026-10-07) — phần cần dữ liệu thật: BLOCKED |
 | E | Task Drawer + Real Backend Integration | ✅ COMPLETED (2026-10-07) — live backend QA 52/52 |
-| F | Projects / MyTasks / Filter | ⬜ |
+| F | My Tasks + Projects + Modal hardening | ✅ COMPLETED (2026-10-07) — live backend QA 56/56; một số nhánh BLOCKED theo phạm vi |
 | G | Dashboard | ⬜ |
 | H | Forms / Modal / Auth / Settings | ⬜ |
 | I | Responsive pass | ⬜ |
@@ -1133,6 +1133,173 @@ login · Projects hiển thị project thật + avatar tone dùng chung · Board
 
 ---
 
+# Phase F — COMPLETED
+
+> 2026-10-07 · Code commit `67844d1` (`feat(ui): harden my tasks projects and modal UX`). Kiểm bằng **backend thật** (bản sao local, DB `teamflow_ui_qa`) như Phase E. Không sửa backend, không đổi endpoint/payload/route/auth/socket/dnd/kiến trúc drawer.
+
+## Objective
+
+Làm chắc My Tasks và Projects (trạng thái tải/lỗi/rỗng thật, không số 0 giả), thay toàn bộ `alert`/`window.confirm` bằng **một** Modal xác nhận dùng chung + thông báo dùng chung, audit lời gọi `/task/my-task` trùng ở Header/Nav.
+
+## Modal & Notification
+
+**`ConfirmProvider` + `useConfirm()`** (`src/components/common/ConfirmProvider.jsx`, `confirmContext.js`) — một modal duy nhất, mount ở `App.jsx`:
+- `await confirm({ title, message, confirmLabel, cancelLabel, tone: 'danger', onConfirm })` → `true` khi đã xác nhận (và `onConfirm` thành công), `false` khi huỷ.
+- Có `onConfirm`: modal **giữ mở** khi request chạy, hai nút disabled + spinner "Đang xử lý…", chặn submit lần hai (ref đồng bộ), lỗi API hiện **trong modal** (`role="alert"`), chỉ đóng khi thành công.
+- Nút mặc định **"Hủy | Xác nhận"**; `tone: 'danger'` → nút đỏ + icon cảnh báo.
+- a11y: `role="alertdialog"`, `aria-modal`, `aria-labelledby`/`aria-describedby`, `aria-busy`; focus vào **Hủy** (mặc định an toàn); Tab/Shift+Tab bị giữ trong modal; Esc / X / bấm nền = huỷ (không khi đang chạy); focus trả về nút kích hoạt — nếu nút đó đã mất (vd. checklist item đang chờ) thì về dialog bên dưới (Task Drawer); khoá cuộn trang, không mở khoá nếu drawer vẫn mở.
+- Phím xử lý ở **window capture** → Esc/Tab không lọt xuống listener của Task Drawer (Esc lần 1 đóng modal, lần 2 mới đóng drawer).
+- Responsive: `max-height: 100dvh - 32px`, rộng 384px (≤ viewport − 32px), nút footer chia đôi ở <768px.
+
+**`notify()` + `<Notifier/>`** (`src/utils/notify.js`, `src/components/common/Notifier.jsx`) — toast dùng lại CSS `.toast` có sẵn:
+- `notify({ type: 'success'|'error'|'info', title, message })` qua window event; tối đa 4 toast, tự ẩn 4/5/7 giây, nút đóng có `aria-label`; lỗi `role="alert"`, còn lại `role="status"`; `z-index: var(--z-toast)` (trên modal); mobile full-width.
+- `queueNotice()` cho luồng **reload cả trang** (`api.jsx` 403 ACCOUNT_SUSPENDED → `window.location.href='/login'`): lưu `sessionStorage`, `Notifier` hiện sau khi tải lại (không sửa `Login.jsx`).
+
+## Alert / Confirm Migration
+
+24 vị trí → **0** `alert`/`window.confirm` còn lại trong `src/` + `api.jsx` (grep xác nhận).
+
+| # | File | Trước | Loại | Sau |
+|---|---|---|---|---|
+| 1 | MyTasks.jsx (drawer) | confirm xoá công việc | Phá huỷ | ConfirmDialog danger; `onConfirm` = request cũ; lỗi: `setSaveError` như cũ **và** hiện trong modal |
+| 2 | ProjectBoard.jsx (drawer) | confirm xoá task | Phá huỷ | như #1 |
+| 3 | ProjectBoard.jsx (drawer) | confirm xoá checklist | Phá huỷ | ConfirmDialog; xoá lạc quan + rollback giữ nguyên bên trong `onConfirm` |
+| 4 | ProjectCalendar.jsx | confirm xoá task | Phá huỷ | ConfirmDialog; xoá lạc quan + `loadData()` khi lỗi giữ nguyên; icon xoá → `<button aria-label>` |
+| 5 | ProjectCalendar.jsx | confirm xoá note | Phá huỷ | như #4 |
+| 6 | ProjectOverview.jsx | confirm xoá tài liệu | Phá huỷ | ConfirmDialog; alert lỗi cũ → lỗi trong modal (cùng nội dung) |
+| 7 | ProjectSetting.jsx | confirm xoá thành viên | Phá huỷ | ConfirmDialog; trước đây lỗi chỉ `console` → nay hiện trong modal |
+| 8 | ProjectSetting.jsx | confirm xoá dự án | Phá huỷ | ConfirmDialog; `navigate('/dashboard')` khi thành công như cũ |
+| 9–11 | ProjectSetting.jsx (submit) | alert ngày không hợp lệ ×3 | Validation | toast error, `return` như cũ |
+| 12–13 | ProjectSetting.jsx (onChange) | alert ngày quá khứ ×2 | Validation | toast error, giá trị vẫn reset về hôm nay/min như cũ |
+| 14 | ProjectOverview.jsx | alert lưu mô tả lỗi | Error | toast error (title + message API) |
+| 15 | ProjectOverview.jsx | alert thiếu quyền upload | Permission | toast error |
+| 16 | ProjectOverview.jsx | alert chưa chọn file | Validation | toast info |
+| 17 | ProjectOverview.jsx | alert upload lỗi | Error | toast error |
+| 18–19 | Register.jsx | alert mật khẩu không khớp / đăng ký thất bại | Validation/Error | toast error (form giữ nguyên) |
+| 20 | ResetPassword.jsx | alert phiên hết hạn → `/forgot` | Info | toast info + điều hướng như cũ |
+| 21 | ResetPassword.jsx | alert đổi mật khẩu thành công → `/Login` | Success | toast success + điều hướng như cũ |
+| 22 | App.jsx (socket `user_banned`) | alert bị vô hiệu hoá | Forced logout | toast error (SPA, toast sống qua `navigate`) |
+| 23 | api.jsx (403 suspended) | alert bị khoá | Forced logout | `queueNotice` → hiện trên /login sau reload |
+| 24 | ProjectOverview.jsx (xoá tài liệu lỗi) | alert | Error | gộp vào #6 (lỗi trong modal) |
+
+Không đổi: điều kiện quyền trước confirm, request/payload, cập nhật state khi thành công, rollback/reload khi lỗi.
+
+## My Tasks
+
+- Request qua `api.jsx`: thêm `fetchMyTasks()` (endpoint **có sẵn** `GET /task/my-task`) + dùng `fetchProjectById` có sẵn. Network (đo thật): cùng URL, cùng method, `Authorization: Bearer …` + `Content-Type: application/json`; khác biệt duy nhất: `GET /project/:id` nay cũng gửi `Content-Type` (header của `getAuthHeaders`), và client handling của `api.jsx` (401 → về /login, 403 suspended → logout) áp dụng cho trang này.
+- 4 trạng thái: **Loading** (`role="status"`, không hiện rỗng/rows), **Success**, **Empty** (phân biệt "No tasks assigned to you" và "No tasks found" khi lọc/tìm), **Error** (`ErrorState` + **Retry gọi lại request thật**).
+- Search: icon `Search` + `aria-label`, `type="search"`; vẫn lọc tiêu đề phía client như cũ (không thêm filter, không gửi request).
+- Inline style: 11 → **1** (chấm màu project — giá trị dữ liệu); class mới `.my-tasks-*`; ☑ (ký tự) → icon `CheckSquare`; tab có `type="button"` + `aria-pressed`.
+- Một lớp padding (KI-20) và 5 tab vừa màn hình ≤639px (trước tràn 14px).
+
+## Projects
+
+- Số liệu từng project có trạng thái `loading | success | error` (`loadTaskStats`, cùng request + quy tắc "done" = `columnId.position === 3`).
+- Success → số thật; **0 thật → "0 tasks" / "0%"**; lỗi → **"—"** (có `title` + chữ cho screen reader), không bao giờ "0" giả; một `ErrorState` inline phía trên lưới "Couldn't load task counts. N project(s) show "—"…" + **Retry chỉ gọi lại các project lỗi** (spinner trên card trong lúc chờ). Không đặt nút trong card vì card là `<Link>` (tránh phần tử tương tác lồng nhau).
+- Một lớp padding (KI-20).
+
+## Header / Nav Audit (`/task/my-task`)
+
+Đo bằng CDP (initiator stack) khi mở `/myTasks` (dev, StrictMode):
+
+| Nguồn | Mục đích | Request | Khi nào |
+|---|---|---|---|
+| `MyTasks.jsx` | Dữ liệu trang | `GET /task/my-task` ×1, `GET /project/:id` ×1/project | mount + Retry |
+| `Header.jsx` | Chuông thông báo (danh sách task sắp hết hạn, **0–2 ngày**, startDate lấy thêm từ `/project/:id`) | `GET /task/my-task` ×4, `GET /project/:id` ×4 | mount + **mỗi** event `myTasksUpdated` |
+| `Nav.jsx` | Badge "My Tasks" (đếm **1–2 ngày**, chỉ dùng `projectId.startDate` đã populate, không gọi `/project/:id`) | `GET /task/my-task` ×4 | mount + **mỗi** event `myTasksUpdated` |
+
+- `MyTasks` phát `myTasksUpdated` mỗi khi `tasks`/`projectMap` đổi (kể cả lúc khởi tạo); Header/Nav **bỏ qua `detail.count`** và tự fetch lại.
+- Không có cache/state dùng chung; ba nơi giữ state riêng, chỉ nối nhau bằng window event.
+- Kết luận: bỏ bất kỳ request nào sẽ **đổi số trên badge/chuông** (hai điều kiện đếm khác nhau, nguồn startDate khác nhau) hoặc làm chuông/badge không còn tự cập nhật → **chưa chứng minh được an toàn → giữ nguyên** (DEC-045). Hướng gom (đề xuất, cần user duyệt — DEC-P05): một hook/store `useMyTasks` fetch một lần, mỗi nơi tính số theo đúng quy tắc hiện tại của nó.
+
+## Accessibility
+
+- Modal: alertdialog, focus trap, Esc, trả focus, `aria-busy`, lỗi `role="alert"`.
+- Toast: `role="alert"`/`status`, nút đóng có nhãn.
+- Calendar: 2 icon xoá (SVG có `onClick`, không dùng được bằng bàn phím) → `<button>` có `aria-label` (CSS `.calendar-delete-btn`).
+- Setting: nút "…" thành viên có `aria-label="Member actions"` + `aria-expanded`.
+- My Tasks: `role="search"`, `aria-label` ô tìm, tab `aria-pressed`, row focus-visible; Projects: spinner/"—" có chữ cho screen reader (`.sr-only` mới trong `style.css`).
+
+## Changed Files
+
+| File | Loại | Ghi chú |
+|---|---|---|
+| `src/components/common/ConfirmProvider.jsx` | Mới | Modal xác nhận dùng chung |
+| `src/components/common/confirmContext.js` | Mới | Context + `useConfirm()` (file `.js` để không vi phạm fast-refresh) |
+| `src/components/common/Notifier.jsx` | Mới | Toast toàn app |
+| `src/utils/notify.js` | Mới | `notify`, `queueNotice`, `takeQueuedNotice` |
+| `src/App.jsx` | Sửa | Bọc `ConfirmProvider`, mount `Notifier`; `user_banned` → toast |
+| `api.jsx` | Sửa | `fetchMyTasks` (endpoint có sẵn); 403 suspended → `queueNotice` |
+| `src/pages/MyTasks/MyTasks.jsx` | Sửa | api.jsx, 4 trạng thái + Retry, search icon, bỏ inline style, confirm |
+| `src/pages/Project/Project.jsx` | Sửa | KI-17 (stats loading/success/error + Retry), padding |
+| `src/pages/Project/ProjectBoard.jsx` | Sửa | Confirm xoá task/checklist |
+| `src/pages/Project/ProjectCalendar.jsx` | Sửa | Confirm xoá task/note; icon → button |
+| `src/pages/Project/ProjectOverview.jsx` | Sửa | Confirm xoá tài liệu; 4 alert → toast |
+| `src/pages/Project/ProjectSetting.jsx` | Sửa | Confirm xoá thành viên/dự án; 5 alert → toast; aria nút "…" |
+| `src/pages/Register/Register.jsx`, `src/pages/ForgetPassword/ResetPassword/ResetPassword.jsx` | Sửa | alert → toast (giao diện form không đổi) |
+| `src/assets/style/components.css` | Sửa | `.confirm-*`, `.app-toasts`, `.my-tasks-*`, `.project-stats-*`, `.calendar-delete-btn`, padding đơn |
+| `src/assets/style/responsive.css` | Sửa | Toast/footer modal mobile, pill tabs My Tasks ≤639px |
+| `src/assets/style/style.css` | Sửa | `.sr-only` |
+
+## Validation
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `npm run build` | ✅ JS 953.35 KB (gzip 276.82), CSS 82.73 KB (gzip 14.46); cảnh báo chunk > 500 KB có sẵn |
+| `npm run lint` | ✅ 0 error · **55 warning** (HEAD `3ccf52c`: 56) — so theo file + rule: **không có cảnh báo mới**, chỉ giảm 1 (Project.jsx no-unused-vars) |
+| Live QA phần 1 (`liveF.mjs`, backend thật) | ✅ **50/50** — audit request, My Tasks (api.jsx, headers, search, empty, loading, error + Retry), Projects KI-17 (success, lỗi "—", Retry + spinner, 0 thật), ConfirmDialog trên drawer (aria, focus, Tab trap, Esc chỉ đóng modal, Hủy, lỗi API, loading, chống double submit, xoá checklist thật 200, rollback khi lỗi, focus về drawer), modal 5 viewport, toast Setting/Register/ResetPassword, 403 suspended sau reload, 0 lỗi console ngoài lỗi mạng chủ động gây ra |
+| Live QA phần 2 (`liveF2.mjs`) | ✅ **6/6** — Setting: nút "…" có nhãn, Remove Member → ConfirmDialog, Hủy không gửi DELETE; xác nhận Calendar không hiển thị task với backend thật (KI-36) |
+| Modal 5 viewport | ✅ 1280×800, 1024×768, 768×1024, 390×844 (358px), 375×812 (343px): trong viewport, nút thấy đủ, không tràn trang, không cuộn trong modal |
+| 13 route × 5 viewport (CDP, đăng nhập, id project thật) | ✅ không tràn ngang document; My Tasks/Projects sạch ở cả 5 viewport (pill tab My Tasks hết tràn). Cờ còn lại **có sẵn từ Phase E** (List/Chart `.page-content` cuộn ngang, input Setting) + Calendar cắt cột CN ở ≤390px (KI-37, layout có sẵn) |
+| Login / Register / Forgot | ✅ page dump so với Phase E: **0 khác biệt** (690 phần tử × 5 viewport) |
+| Không còn native dialog | ✅ grep 0 kết quả; CDP `Page.javascriptDialogOpening` = 0 trong mọi test |
+
+### PASS
+
+My Tasks (api.jsx, 4 trạng thái, Retry thật, search icon, inline style, mobile tabs, padding) · Projects KI-17 (số thật / "—" / 0 thật / Retry) · ConfirmDialog (xoá task trên Board drawer: Hủy/Esc/lỗi API; xoá checklist: thành công thật + lỗi + loading + double submit) · Remove Member (Hủy) · toast Setting/Register/ResetPassword · 403 suspended → toast sau reload · modal 5 viewport · build/lint · Auth pages không đổi.
+
+### BLOCKED (không chạy nhánh này — có lý do)
+
+- **Nhánh xác nhận thành công** của xoá task / dự án / thành viên / tài liệu / note: ngoài phạm vi Phase F ("không mở rộng sang Delete Task/Project/Member, Upload, Notes"); đã kiểm Hủy/Esc (+ lỗi API cho xoá task). Code dùng nguyên request và xử lý thành công cũ.
+- **Calendar xoá task/note**: backend thật không có `date`/`dueDate` trong schema Task nên lịch không có task nào để xoá (KI-36); note thuộc phạm vi Notes. Đã kiểm bằng code + nút có nhãn.
+- **Delete project**: chỉ Admin (`canDelete = isAdmin`), tài khoản QA không phải Admin.
+- **Overview**: lưu mô tả lỗi / upload lỗi / chưa chọn file (Upload ngoài phạm vi; nút submit disabled khi chưa chọn file nên toast "chọn file" gần như không xảy ra).
+- **Socket `user_banned`**: cần Admin khoá tài khoản thật; nhánh tương đương (403 suspended) đã PASS.
+- **Register thất bại từ server**: không tạo tài khoản thật (KI-28 backend).
+
+## Known Issues
+
+- **KI-17 ✅**, **KI-18 ✅** đã sửa. **KI-20 ◐**: My Tasks + Projects đã một lớp padding; Dashboard/Admin… còn lại. **KI-34 ◐**: My Tasks còn 1 inline style dữ liệu (màu project); ProjectBoard modal tạo task vẫn 11 (Phase H). **KI-35 ◐**: My Tasks đã qua `api.jsx`; Header/Nav/KPI/AdminUsers vẫn `fetch` trực tiếp. **KI-03**: đã audit, giữ nguyên (DEC-045).
+- **KI-36 (mới, backend/data)**: Calendar đọc `task.date || task.dueDate` nhưng schema Task của backend không có hai trường này → lịch không bao giờ hiện task (PUT `dueDate` bị bỏ qua).
+- **KI-37 (mới, có sẵn)**: Calendar ≤390px: lưới 7 cột bị cắt, nút "Add note" cột Chủ nhật nằm ngoài mép (layout có sẵn, Phase I).
+- **KI-38 (mới)**: Header/Nav fetch lại `/task/my-task` (Header kèm `/project/:id` mỗi project) ở **mỗi** `myTasksUpdated`; mở /myTasks (dev) = 9 lần `/task/my-task`. Chưa gom (DEC-045 / DEC-P05).
+- **KI-39 (mới)**: Badge sidebar (1–2 ngày) và chuông (0–2 ngày, có fallback startDate) đếm khác nhau — cần user quyết quy tắc nghiệp vụ trước khi gom.
+- **KI-40 (mới, có sẵn)**: Xoá checklist trong drawer My Tasks không có bước xác nhận (Board có) — giữ nguyên hành vi, không tự thêm.
+- **KI-41 (mới)**: Project.jsx và AdminUsers còn toast cục bộ riêng (không phải alert) — nên chuyển sang `notify()` (Phase H).
+- **KI-42 (mới, giống KI-29)**: Setting gọi `deleteMemberByProject(member._id)` một tham số → URL `/member/undefined/project/<memberId>`; route backend `/:id/project/:id` trùng tên tham số nên có thể vẫn chạy "nhờ may" — chưa kiểm nhánh thành công (ngoài phạm vi), không tự sửa.
+
+## Decisions
+
+- **DEC-045**: Audit `/task/my-task`: **giữ nguyên** cả 3 nguồn (MyTasks, Header, Nav) vì bỏ bất kỳ nguồn nào đều đổi số badge/chuông hoặc mất tự cập nhật; gom chỉ làm khi user duyệt quy tắc đếm (DEC-P05 vẫn chờ).
+- **DEC-046**: Một ConfirmDialog duy nhất (Provider + `useConfirm`); hợp đồng `onConfirm`: giữ mở khi chạy, disable + spinner, chặn double submit, lỗi trong modal, đóng khi thành công; nhãn "Hủy | Xác nhận"; focus đầu vào Hủy; phím ở window capture để không ảnh hưởng Task Drawer.
+- **DEC-047**: Lỗi/thông tin/thành công từng là `alert` → toast toàn app (`notify`), kể cả validation ngày và form Auth, để không đổi layout form; luồng có reload cả trang dùng `queueNotice` (sessionStorage).
+- **DEC-048**: Với thao tác phá huỷ, lỗi API hiện trong modal (thay alert/console); xử lý cũ của trang (saveError, rollback, `loadData`) **giữ nguyên** song song.
+- **DEC-049**: My Tasks dùng `api.jsx` (thêm `fetchMyTasks` cho endpoint sẵn có, không endpoint mới); chấp nhận client handling chung của `api.jsx` (401/403) và header `Content-Type` trên GET `/project/:id`.
+- **DEC-050**: Số liệu project: "—" = không biết (lỗi), "0" chỉ khi API trả rỗng thật; Retry chỉ các project lỗi, đặt ngoài card (card là Link).
+- **DEC-051**: My Tasks + Projects dùng một lớp padding (`.page-content`); pill tab My Tasks co giãn vừa màn hình điện thoại thay vì cuộn ngang.
+- **DEC-052**: Icon có `onClick` (Calendar) đổi thành `<button>` có nhãn; nút icon "…" có `aria-label` + `aria-expanded` — không đổi logic.
+
+## Next Phase
+
+**Phase G — Dashboard** (chỉ đề xuất, **chưa thực hiện**, chờ user cho phép):
+1. Dashboard/KPI: trạng thái loading/empty/error thật cho từng widget (KPI đã có ErrorState ở Phase B) — không số 0 giả, không mock (KI-08: widget mock tĩnh hiện không render → quyết định ẩn hẳn hay nối API thật nếu backend có).
+2. Một lớp padding (KI-20 phần Dashboard), bỏ inline style trình bày, `class=` → `className` ở widget còn dùng (KI-13).
+3. KPI chuyển `fetch` trực tiếp sang `api.jsx` (KI-35) — cùng endpoint, đo Network như Phase F.
+4. Responsive 5 viewport + a11y (card thống kê có nhãn, biểu đồ có mô tả văn bản).
+5. Không gom Header/Nav (DEC-045) trừ khi user duyệt DEC-P05 + quy tắc đếm (KI-39).
+
+---
+
 ## Decisions
 
 ### Đã chốt (đề xuất mặc định — user có thể bác bỏ khi duyệt)
@@ -1163,13 +1330,14 @@ login · Projects hiển thị project thật + avatar tone dùng chung · Board
 - **DEC-022 … DEC-027 (Phase C)**: xem mục *Phase C — COMPLETED › Decisions*.
 - **DEC-024 (xác nhận), DEC-028 … DEC-034 (Phase D)**: xem mục *Phase D — COMPLETED › Decisions*.
 - **DEC-035 … DEC-044 (Phase E)**: xem mục *Phase E — COMPLETED › Decisions*.
+- **DEC-045 … DEC-052 (Phase F)**: xem mục *Phase F — COMPLETED › Decisions*.
 - **DEC-021 (Phase B)**: Menu tài khoản/ lời chào chỉ dùng dữ liệu có thật trong `localStorage.user`; thiếu thì hiển thị trung tính, không dùng tên/email/role giữ chỗ.
 
 ### Chờ user quyết định
 
 - **DEC-P03**: Có làm dark mode không? *(Khuyến nghị: chuẩn bị token ngay, bật dark ở Phase K nếu còn thời gian)*
 - **DEC-P04**: Gộp logic 2 bản `TaskDrawer` (Board + MyTasks) hay chỉ đồng bộ giao diện? *(Khuyến nghị: chỉ đồng bộ giao diện trước)*
-- **DEC-P05**: Có được sửa `Header`/`Nav` để không gọi trùng API `/task/my-task` và N lần `/project/:id`? *(Ngoài phạm vi UI thuần; khuyến nghị: để sau)*
+- **DEC-P05**: Có được sửa `Header`/`Nav` để không gọi trùng API `/task/my-task` và N lần `/project/:id`? *(Ngoài phạm vi UI thuần; khuyến nghị: để sau)* — **Phase F đã audit** (DEC-045, KI-38/KI-39): giữ nguyên; muốn gom cần user chốt quy tắc đếm badge/chuông.
 
 ---
 
@@ -1207,6 +1375,7 @@ login · Projects hiển thị project thật + avatar tone dùng chung · Board
 | D | `src/pages/Project/ProjectBoard.jsx` | Sửa | Dùng TaskCard (1699 → 1529 dòng) |
 | D | `src/assets/style/{components,style}.css`, `src/pages/Project/project.css` | Sửa | CSS card, tooltip, avatar tone, KI-12; gỡ rule card cũ |
 | E | xem *Phase E — COMPLETED › Changed Files* | Mới/Sửa | Task Drawer dùng chung, apiConfig/env, avatar util, realtime drawer, URL tập trung |
+| F | xem *Phase F — COMPLETED › Changed Files* | Mới/Sửa | ConfirmDialog + Notifier dùng chung, 24 alert/confirm, My Tasks, Projects KI-17 |
 
 ---
 
@@ -1237,7 +1406,7 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 |---|---|---|
 | KI-01 | Không có backend để kiểm tra UI với dữ liệu thật | Chờ user (DEC-P06) |
 | KI-02 | ~~Import path sai hoa/thường~~ | ✅ Đã hết ở Phase B (các import này bị gỡ khi chuyển trang vào MainLayout) |
-| KI-03 | Header + Nav gọi trùng `/task/my-task`; Header gọi `/project/:id` cho từng project | Ngoài phạm vi UI (DEC-P05) |
+| KI-03 | Header + Nav gọi trùng `/task/my-task`; Header gọi `/project/:id` cho từng project | Đã audit ở Phase F → giữ nguyên (DEC-045); xem KI-38/KI-39 |
 | KI-04 | 4 package không dùng: `axios`, `react-icons`, `chart.js`, `react-chartjs-2` | Ghi nhận, không tự gỡ |
 | KI-05 | Bundle 948 KB, không code-split | Phase L nếu được đồng ý |
 | KI-06 | `main.js`, `src/App.css`, `src/index.css`, `src/assets/style/main.css` là legacy/template không dùng hoặc gần như không dùng | Ghi nhận, không tự xoá |
@@ -1250,16 +1419,17 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 | KI-14 | **BLOCKED**: QA Board với dữ liệu thật (kéo thả, task card, drawer, modal tạo task, realtime socket) và nhánh "thành công" của mọi trang trong shell mới | Chờ backend (DEC-P06) |
 | KI-15 | ~~Filter bar của Board có width cố định inline~~ | ✅ Đã sửa ở Phase C (BoardToolbar responsive) |
 | KI-16 | Tên workspace "Nang Cao Team" trong sidebar là chữ tĩnh (không có API workspace) | Ghi nhận; cần nguồn dữ liệu nếu muốn động |
-| KI-17 | Trang Projects: khi tải số task/thành viên **của từng project** lỗi, card vẫn hiện 0 (fallback cũ) — chỉ lỗi danh sách chính mới có Error State | Phase F |
-| KI-18 | MyTasks đã có thông báo lỗi riêng nhưng chưa có Retry, ô search chưa có icon | Phase F |
+| KI-17 | ~~Trang Projects: số task từng project lỗi vẫn hiện 0~~ | ✅ Phase F: "—" + Retry, 0 chỉ khi rỗng thật (DEC-050) |
+| KI-18 | ~~MyTasks chưa có Retry, ô search chưa có icon~~ | ✅ Phase F |
 | KI-19 | Nội dung trang Project vẫn thụt lề theo cấu trúc cũ (16 khoảng trắng) sau khi bỏ wrapper — giữ nguyên để diff nhỏ | Ghi nhận (chỉ định dạng) |
-| KI-20 | `.page-content` + `.page-content-inner` / padding inline → padding kép trên một số trang | ◐ Board đã xử lý ở Phase C; các trang khác → Phase F |
+| KI-20 | `.page-content` + `.page-content-inner` / padding inline → padding kép trên một số trang | ◐ Board (Phase C), My Tasks + Projects (Phase F) đã xử lý; Dashboard/Admin… → Phase G/H |
 | KI-21 | Board chưa có Sort / Assignee / Priority filter (tính năng mới) | **Future Enhancement** — user giữ phạm vi Search + Week (DEC-024 xác nhận) |
 | KI-22 | Icon trạng thái cột suy từ tên cột; tên lạ → icon trung tính | Ghi nhận; nên map theo trường trạng thái nếu backend có |
 | KI-23 | ~~Nội dung task card còn inline style~~ | ✅ Đã sửa ở Phase D (TaskCard 0 inline style trình bày) |
 | KI-25 | Chữ viết tắt 2 ký tự trong avatar 20px khá dày khi chồng nhau | Chấp nhận; tuỳ chọn 1 ký tự nếu user muốn |
 | KI-26 | ~~Màu avatar chưa đồng bộ~~ | ✅ Đã sửa ở Phase E (`src/utils/avatar.js`, seed = user id) |
-| KI-28…KI-35 | Phát hiện ở Phase E (backend register/checklist delete, kéo bàn phím cột khuất, socket reconnect, Task.status, task_reviewed, inline style còn lại, fetch trực tiếp) | Xem *Phase E — COMPLETED › Known Issues* |
+| KI-28…KI-35 | Phát hiện ở Phase E (backend register/checklist delete, kéo bàn phím cột khuất, socket reconnect, Task.status, task_reviewed, inline style còn lại, fetch trực tiếp) | Xem *Phase E — COMPLETED › Known Issues*; KI-34/KI-35 ◐ sau Phase F |
+| KI-36…KI-42 | Phát hiện ở Phase F (Calendar không có ngày task từ backend, Calendar cắt cột ≤390px, Header/Nav refetch theo event, quy tắc đếm badge/chuông khác nhau, xoá checklist My Tasks không xác nhận, toast cục bộ còn lại, tham số xoá thành viên) | Xem *Phase F — COMPLETED › Known Issues* |
 | KI-27 | Card `role="button"` (dnd) chứa nút Not accept lồng bên trong | Giữ để không phá drag handle toàn card |
 | KI-24 | Tên project dài làm meta header xuống dòng ở tablet (header ~155px) | Chấp nhận (không cắt tên quá sớm) |
 | KI-11 | `api.jsx` nằm ngoài `src/` | Ghi nhận, không di chuyển |
@@ -1268,7 +1438,7 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 
 ## Next Phase
 
-**Phase F — Projects / MyTasks / Filter consistency** — chỉ bắt đầu khi user cho phép. Chi tiết đề xuất: xem *Phase E — COMPLETED › Next Phase*.
+**Phase G — Dashboard** — chỉ bắt đầu khi user cho phép. Chi tiết đề xuất: xem *Phase F — COMPLETED › Next Phase*.
 
 <details><summary>Đề xuất Phase C trước đây (đã thực hiện)</summary>
 
