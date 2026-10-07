@@ -7,9 +7,9 @@
 | Mục | Giá trị |
 |---|---|
 | Cập nhật lần cuối | 2026-10-06 |
-| Trạng thái hiện tại | **Phase A, B, C, D COMPLETED** (Phase D: 2026-10-07). Mọi kiểm thử cần dữ liệu thật: **BLOCKED — requires live backend** |
-| Code đã sửa | Có — xem **Changed Files**. Git: baseline `a9ef6f4`, Phase A `4908de3`, Phase B `88caebf`, Phase C `a5701fe`, Phase D `1ace444` |
-| Phase triển khai kế tiếp | Phase E — Task Detail Drawer (**chờ user cho phép**) |
+| Trạng thái hiện tại | **Phase A–E COMPLETED** (Phase E: 2026-10-07). Phase E đã chạy **backend thật** (bản sao local, DB QA riêng) — xem *Phase E › Backend Integration* |
+| Code đã sửa | Có — xem **Changed Files**. Git: baseline `a9ef6f4`, Phase A `4908de3`, Phase B `88caebf`, Phase C `a5701fe`, Phase D `1ace444`, Phase E `c2af4e2` |
+| Phase triển khai kế tiếp | Phase F — Projects / MyTasks / Filter consistency (**chờ user cho phép**) |
 
 ---
 
@@ -481,7 +481,7 @@ Một hệ breakpoint duy nhất (giữ theo `responsive.css`): **sm 640 · md 7
 | B | App Shell / Sidebar / Header (+ API error state) | ✅ COMPLETED (2026-10-06) — phần cần dữ liệu thật: BLOCKED |
 | C | Project Header + Kanban Board | ✅ COMPLETED (2026-10-06) — phần cần dữ liệu thật: BLOCKED |
 | D | Task Card | ✅ COMPLETED (2026-10-07) — phần cần dữ liệu thật: BLOCKED |
-| E | Task Detail Drawer | ⬜ |
+| E | Task Drawer + Real Backend Integration | ✅ COMPLETED (2026-10-07) — live backend QA 52/52 |
 | F | Projects / MyTasks / Filter | ⬜ |
 | G | Dashboard | ⬜ |
 | H | Forms / Modal / Auth / Settings | ⬜ |
@@ -931,6 +931,206 @@ Giữ nguyên DEC-P06. Khi có backend cần chạy: kéo thả chuột + bàn p
 4. Đồng bộ avatar trong drawer với `.avatar` + `--avatar-tone-*` (KI-26).
 5. Giữ nguyên toàn bộ handler (cập nhật field, checklist, comment, xoá task, assignee). Nghiệm thu với dữ liệu thật vẫn **BLOCKED**.
 
+
+# Phase E — COMPLETED
+
+> Ngày 2026-10-07 · commit code: `c2af4e2`. Phạm vi: Task Drawer (Board + My Tasks) + tích hợp & kiểm chứng với **backend thật**.
+> Không sửa mã backend, không mock dữ liệu trong repo, không đổi API contract, không đổi business logic/quyền.
+
+## Objective
+
+Nâng cấp Task Drawer (thứ bậc, a11y, mobile, trạng thái loading/error/success cho từng phần), tách phần trình bày dùng chung cho 2 drawer, kết nối và **kiểm chứng TaskCard ↔ TaskDrawer bằng dữ liệu thật**, xử lý KI-26 (màu avatar) và dọn inline style của drawer.
+
+## Backend Integration
+
+**Vị trí backend (xác định bằng bằng chứng, không đoán)**: `C:\Users\ASUS\Downloads\doancuccang-main (2)\doancuccang-main` — chứa chính file `BACKEND_CONTEXT_FOR_CLAUDE.txt`, `socket.js` (join_project/leave_project), route `note`, multer, script `dev`, chuỗi `secretkey_kanban_123`. Hai bản khác (`doancuccang-main\doancuccang-main` 29/09 — thiếu socket/note/multer; `doancuccang-main (1)\Kanban_1` — frontend khác) **không** khớp tài liệu.
+
+**Cách chạy (không chạm repo backend, không chạm dữ liệu thật của nhóm)**:
+- Repo backend không có `.env`, `node_modules`; `MONGO_URL` không có mặc định trong code (DB thật của nhóm không có/không đoán).
+- MongoDB 8.3 cục bộ đang chạy (service `MongoDB`, 27017) — không có DB nào của dự án.
+- Chép mã nguồn backend sang thư mục tạm của phiên → `npm install` ở bản sao → chạy `node index.js` với biến môi trường `MONGO_URL=mongodb://127.0.0.1:27017/teamflow_ui_qa`, `PORT=3000` (không tạo `.env`). Kết quả: `Connected DB. Server is running on port 3000`; `GET /api/project` không token → **401 {message:"not found token"}** (đúng tài liệu).
+- Dữ liệu QA tạo **qua API thật** (register/login/POST project/invite/POST task/checklist/comments) vào DB `teamflow_ui_qa`: 2 tài khoản `qa_manager` (Manager) / `qa_member` (Member), project "QA Board Project" (backend tự tạo 4 cột), 4 task. Không có dữ liệu nào trong repo.
+
+**BACKEND CONNECTIVITY = VERIFIED (local QA instance)**. Môi trường/DB thật của nhóm: **không xác định, không kiểm tra**.
+
+## Task Drawer Architecture
+
+**Audit 2 drawer (trước khi sửa)**
+
+| Aspect | Board Drawer | MyTasks Drawer | Shared | Different |
+|---|---|---|---|---|
+| UI | header priority + "Updated…", 2 ô sửa tiêu đề, grid Status/Priority/Points/Week/Assignees, Description, Checklist, Comments, Activities, Delete | gần giống; header "Role: …"; Week là input số | bố cục, section | vài nhãn/ô nhập |
+| Props | taskId, open, close, **columns, projectMembers, maxWeeks, isManager, isLeader** từ trang | taskId, open, close, onTaskUpdated/Deleted | taskId/open/close/callbacks | Board nhận dữ liệu từ trang; MyTasks tự tải |
+| State/data | GET task + comments + activity | GET task → **fetch cứng localhost** lấy project → columns + members → comments + activity | GET task/comments/activity | MyTasks tự tải project/columns/members, tính due date theo tuần |
+| API | updateTask, deleteTask, add/toggle/deleteChecklist, addComment | giống | toàn bộ | — |
+| Quyền | Manager: sửa tất cả + xoá; Manager/Leader: assignee, thêm/xoá checklist; **ai cũng toggle** | Owner/Manager/Admin/Leader: sửa tất cả; **assignee: đổi cột + toggle** | — | khác nhau thật → giữ riêng |
+| Lỗi | lỗi tải task → **spinner mãi**; comments/activity lỗi → `[]` (giả rỗng); thêm comment/checklist lỗi → **mất chữ**, không báo | giống | — | — |
+| Đóng | nút ✕ | nút "✕" chữ | — | — |
+| Checklist delete | gọi `deleteChecklist(itemId)` (1 tham số — xem *Backend Issues*) | giống | — | — |
+
+**Quyết định**: *shared presentation + page-specific data/logic* (DEC-P04, DEC-036). Không gộp 2 drawer thành 1 vì quyền và cách tải khác nhau thật.
+
+| File | Vai trò |
+|---|---|
+| `src/components/task/TaskDrawerFrame.jsx` (mới) | Khung dùng chung: overlay, panel phải / full-screen mobile, `role="dialog" aria-modal aria-labelledby`, Esc/✕/backdrop đóng, focus vào panel khi mở, giữ Tab trong drawer, trả focus về phần tử mở (hoặc card qua `data-rfd-draggable-id` nếu phần tử mở là `<body>`/đã unmount), khoá cuộn `body` và khôi phục |
+| `src/components/task/TaskDrawerSections.jsx` (mới) | `DrawerSection`, `ChecklistSection`, `CommentsSection`, `ActivitySection`, `AssigneePicker`, `UserAvatar` — chỉ trình bày + trạng thái mutation (pending/error); nhận handler trả Promise từ trang |
+| `ProjectBoard.jsx › TaskDrawer` | Giữ toàn bộ state/handler/quyền của Board; thêm loadError/commentsError/activitiesError/saveError, reloadKey (Retry), nhận `syncEvent` realtime từ board |
+| `MyTasks.jsx › TaskDrawer` | Giữ toàn bộ state/handler/quyền của My Tasks; thay `fetch` cứng localhost bằng `fetchProjectById` (cùng endpoint, qua xử lý 401/403 tập trung); thêm các trạng thái lỗi + Retry |
+
+## UI Changes
+
+- Header: `.priority-tag` (Phase A) + trạng thái lưu ("Saving…" / "Updated dd/mm/yyyy" ở Board; "Your role: …" ở My Tasks) + nút đóng icon.
+- Tiêu đề: **một** ô sửa (bỏ ô "Title" trùng; mỗi trang giữ đúng quyền đang có của ô tiêu đề lớn), tự giãn theo nội dung (`field-sizing: content`).
+- Dòng phụ: chip cột · chip hạn (My Tasks, giá trị đã tính sẵn) · avatar assignee.
+- Properties 2 cột: **Column** (đổi nhãn từ "Status" vì ô này sửa `columnId` — DEC-038), Priority (Low/Medium/High/Urgent), Points, Week; Assignees full-width (picker có tìm kiếm khi > 5 thành viên, avatar, email).
+- Description, Checklist (thanh tiến độ, toggle, thêm, xoá icon thùng rác có tooltip), Comments (avatar, tên, thời gian, nội dung, Ctrl+Enter gửi), Activity (dòng thời gian, thứ tự backend), Delete task (vùng nguy hiểm).
+- Select có chevron SVG nội tuyến (không asset ngoài). Inline style: **ProjectBoard 56 → 11**, **MyTasks 43 → 11** (còn lại thuộc modal tạo task / danh sách My Tasks — Phase F/H); component dùng chung chỉ 1 (độ rộng thanh tiến độ — giá trị runtime).
+
+## Checklist
+
+- Add: `POST /api/task/:id/checklist {text}` → 200 (task). Ô nhập giữ chữ nếu lỗi; nút có loading.
+- Toggle: `POST /api/task/:id/checklist/:itemId` → 200 (optimistic + rollback; item disabled khi đang lưu).
+- Delete: xem **KI-29 / Backend Issues** — giữ nguyên lời gọi hiện có, đã kiểm chứng xoá thật; contract theo tài liệu trả 404.
+- Lỗi mutation hiện tại chỗ, không giả thành công.
+
+## Comments
+
+`GET /api/task/:id/comments` (cũ → mới, đúng backend), `POST /api/task/:id/comments {text}` → 201 (comment đã populate user). Dedupe theo `_id` (response POST và socket `comment_added` có thể cùng đến). Gửi lỗi → báo lỗi, giữ chữ, không thêm comment giả. Không thêm sửa/xoá comment (backend không có endpoint).
+
+## Activity
+
+`GET /api/task/:id/activity` hiển thị **đúng thứ tự backend (mới nhất trước)**; `details` thực tế là `null` nên không hiển thị. Tự tải lại sau mỗi thao tác của drawer và khi có sự kiện realtime cho task đang mở (backend không emit activity riêng).
+
+## Realtime
+
+Không tạo socket/listener riêng cho drawer. Board giữ **một** bộ listener (join_project khi mở, leave_project + `socket.off` khi unmount/đổi project) và chuyển tiếp cho drawer qua prop `syncEvent`: `task_updated`/`task_moved` của task đang mở (giữ nguyên trường người dùng đang gõ dở), và **thêm** listener `comment_added` (cleanup cùng chỗ). URL socket lấy từ `VITE_SOCKET_URL` hoặc origin của `VITE_API_URL`.
+
+## Accessibility
+
+Dialog có tên (`aria-labelledby` → ô tiêu đề), focus vào panel khi mở, Tab không thoát khỏi drawer, Esc/✕/backdrop đóng, focus trả về **đúng TaskCard** kể cả khi mở bằng chuột (chuột trên drag handle không focus card — đã phát hiện và sửa trong QA), section có heading `h3`, progressbar có `aria-valuenow`, nút icon có `aria-label` + tooltip, lỗi có `role="alert"`, trạng thái lưu `role="status"`.
+
+## Mobile
+
+< 768px: drawer full-screen (`100dvh`, rộng 100%), properties 1 cột, padding gọn. Đo thật: 390×844 → 390×844, 375×812 → 375 rộng, **không tràn ngang**.
+
+## API Contract Verification
+
+### Backend verified (gọi thật, local QA instance)
+
+| Endpoint | Request | Response thực tế |
+|---|---|---|
+| `POST /api/user/register` | `{username,email,password,role:"User"}` | 201 `{message}` |
+| `POST /api/user/login` | `{email,password}` | 200 `{message,token,user:{id,username,email,role}}` |
+| `GET /api/user/currentUser` | — | 200 `{user,userRole,memberRole}` |
+| `GET /api/project`, `GET /api/project/:id` | — | 200 (array / object; `assignees: []`) |
+| `POST /api/project` | `{name,description,startDate,date}` | 201 `{message,project,columns×4}` (Todo/In Progress/Review/Done) |
+| `POST /api/member/invite` | `{email,role,projectId}` | 201 `{message,member}` (userId populate) |
+| `GET /api/member/project/:id` | — | 200 `[{_id,userId:{_id,username,email,role},role,status,projectId}]` (không có `point`) |
+| `GET /api/column/project/:projectId` | — | 200 `{success,data:[{_id,title,position,projectId,taskOrderIds}]}` |
+| `GET /api/task/project/:id` | — | 200 `[task]` — `columnId` populate `{_id,title,position,projectId}`, `assignees` populate `{_id,username,email}` |
+| `GET /api/task/:id` | — | 200 task (populate như trên; `status: "pending"`) |
+| `PUT /api/task/:id` | `{priority}` / `{description}` / `{title}`… | 200 task — **`columnId` KHÔNG populate (chỉ id)**, assignees populate |
+| `PUT /api/task/:id/move` | `{sourceColumnId,destColumnId,destinationIndex[,action]}` | 200 `{message,taskId}` — `action` do frontend gửi thêm bị backend **bỏ qua** (vô hại) |
+| `POST /api/task/:id/checklist` | `{text}` | 200 task |
+| `POST /api/task/:id/checklist/:itemId` | — | 200 task |
+| `DELETE /api/task/:itemId/checklist/undefined` | (lời gọi hiện có của frontend) | 200 `{message,data:task}` — **xoá thật** |
+| `GET /api/task/:id/comments` | — | 200 `[{_id,taskId,user:{_id,username,email},text,createdAt}]` (cũ → mới) |
+| `POST /api/task/:id/comments` | `{text}` | 201 comment (populate user) |
+| `GET /api/task/:id/activity` | — | 200 `[{_id,taskId,user,action,details:null,createdAt}]` (mới → cũ) |
+| Socket.IO | `join_project`, `leave_project` | nhận `task_updated`, `task_moved`, `comment_added` ở tab khác (đã kiểm) |
+
+### Backend blocked (chưa kiểm)
+
+`task_created`/`task_deleted`/`task_reviewed` realtime, `DELETE /api/task/:id`, project/member delete, upload tài liệu, notes, analytics — ngoài phạm vi Phase E (không test xoá task/project/member theo yêu cầu). Môi trường/DB thật của nhóm — không xác định.
+
+### Backend mismatch
+
+| Endpoint | Vấn đề | Bằng chứng runtime |
+|---|---|---|
+| `DELETE /api/task/:id/checklist/:itemId` | Controller đọc `req.params.id` làm **id checklist item** | Gọi đúng tài liệu `/{taskId}/checklist/{itemId}` → **404 "Checklist item not found"**, item còn nguyên; gọi `/{itemId}/checklist/undefined` → 200, xoá thật |
+| `POST /api/user/register` không có `role` | Controller gán mặc định `'Member'`, schema User chỉ cho `User|Admin` | → **500** `"role: \`Member\` is not a valid enum value"`. Trang Register của frontend gửi `role:"User"` nên không bị |
+| `PUT /api/task/:id` | Response không populate `columnId` (khác `GET /task/:id`) | Frontend đã xử lý bằng `extractColumnId` (không lỗi) |
+
+## Changed Files
+
+| File | Loại | Ghi chú |
+|---|---|---|
+| `src/components/task/TaskDrawerFrame.jsx` | Mới | Khung drawer dùng chung |
+| `src/components/task/TaskDrawerSections.jsx` | Mới | Section/picker/avatar dùng chung |
+| `src/utils/avatar.js` | Mới | Chiến lược màu avatar dùng chung (seed = user id), `getInitials` |
+| `src/config/apiConfig.js` | Mới | `API_BASE_URL` (`VITE_API_URL`), `API_ORIGIN`, `getApiErrorMessage` |
+| `.env.example` | Mới | `VITE_API_URL`, `VITE_SOCKET_URL` (không secret) |
+| `.gitignore` | Sửa | `!.env.example` |
+| `api.jsx` | Sửa | Dùng apiConfig; lỗi `message \|\| error \|\| status` + `error.status`; ghi chú BACKEND MISMATCH ở `deleteChecklist` |
+| `src/utils/socket.js` | Sửa | URL socket từ env |
+| `src/pages/Project/ProjectBoard.jsx` | Sửa | TaskDrawer mới; chuyển tiếp realtime (`comment_added` mới); bỏ `getCurrentUserId` thừa; dùng `API_BASE_URL` (1391 dòng) |
+| `src/pages/MyTasks/MyTasks.jsx` | Sửa | TaskDrawer mới; `fetchProjectById` thay fetch cứng |
+| `src/pages/Project/board/TaskCard.jsx` | Sửa | Dùng `avatarToneClass` dùng chung |
+| `src/pages/Project/Project.jsx` | Sửa | Avatar card project dùng tone theo user id (KI-26), bỏ inline style avatar |
+| `Header.jsx`, `Nav.jsx`, `AdminUsers.jsx`, `KPI.jsx`, `ForgetPassword.jsx`, `ResetPassword.jsx`, `Login.jsx`, `Register.jsx`, `ProjectCalendar.jsx`, `ProjectList.jsx`, `ProjectOverview.jsx`, `ProjectSetting.jsx` | Sửa | Chỉ thay URL cứng `http://localhost:3000/api` bằng `API_BASE_URL` (ProjectOverview: `API_ORIGIN` cho file upload) — cùng endpoint, cùng hành vi |
+| `src/assets/style/components.css`, `responsive.css` | Sửa | CSS drawer (section, checklist, comments, activity, picker, lỗi, animation), mobile full-screen |
+
+## Validation
+
+### PASS
+
+**Level 1 — UI structural (không cần backend)**: `npm run build` ✅ (JS 944.87 KB, CSS 79.08 KB) · `npm run lint` ✅ 0 error / **56 warning** — so theo file+rule với `cbdb5b1` (cuối Phase D): **không có cảnh báo mới** (chỉ giảm) · 13 route × 5 viewport (CDP) ✅ không tràn ngang, điều hướng mobile, không lỗi console · shell Phase B 29/30 (FAIL duy nhất là kiểm tra *giả định backend tắt* "Projects phải hiện Error State" — nay backend chạy nên Projects tải dữ liệu thật, đúng) · Login/Register/Forgot: page dump so với Phase D **0 khác biệt**.
+
+**Level 2 — LIVE BACKEND (local QA instance) — 52/52 PASS** (2 tab trình duyệt với 2 browser context riêng, đăng nhập qua trang Login thật):
+login · Projects hiển thị project thật + avatar tone dùng chung · Board: 4 cột thật, số đếm thật, 4 TaskCard + ProjectHeader thật · 4 GET board → 200 · click card → drawer (dialog, focus bên trong) + 3 GET → 200 · properties đúng dữ liệu thật · checklist 3 item (1 xong) · comments cũ→mới có tác giả + thời gian · activity mới→cũ · **màu avatar cùng user giống nhau trên card và drawer** · Esc đóng + **focus về đúng card** · Enter mở lại · thêm/toggle/xoá checklist (200) · thêm comment (201, ô nhập xoá) · activity tự cập nhật · đổi priority (PUT 200) → card cập nhật · đóng/mở lại → dữ liệu **persist** · **realtime**: comment và priority hiện ở tab người dùng kia · quyền Member không đổi · **kéo thả bàn phím** Review→In Progress (PUT move 200, payload đúng contract, realtime sang tab kia) và quay lại · **kéo chuột** Review→Done (is-dragging + is-drop-target, PUT move 200) · chèn lỗi mạng (CDP `Fetch.failRequest`, không mock): task detail lỗi → ErrorState + Retry → Retry tải lại thật; gửi comment lỗi → báo lỗi, giữ chữ, không thêm comment giả · mobile 390/375 drawer full-screen không tràn · My Tasks: danh sách task thật của Member, drawer dùng khung chung, quyền assignee không đổi, Esc đóng · không exception/lỗi console ở cả 2 tab.
+
+### BLOCKED
+
+| Hạng mục | Lý do |
+|---|---|
+| Môi trường/DB thật của nhóm (Atlas?) | `MONGO_URL` không có trong repo, không được đoán |
+| Kéo thả bằng **bàn phím** sang cột đang khuất (Done ở 1280px) | Giới hạn của @hello-pangea/dnd (bàn phím chỉ tới droppable đang hiển thị) — xem KI-30; chuột vẫn kéo được |
+| `task_created`, `task_deleted`, `task_reviewed` realtime; xoá task/project/member; upload; notes | Ngoài phạm vi Phase E / không test xoá theo yêu cầu |
+| Cộng/trừ điểm khi vào/ra cột Done | Backend: `updateAssigneesPoints` không được export (tài liệu #5) — không thuộc UI |
+
+## Backend Issues Discovered
+
+(Không sửa backend — đề xuất để chủ backend xử lý.)
+1. **Checklist delete** (`controller/task.js › deleteChecklist`): đổi `const { id } = req.params` thành `const { id: taskId, itemId } = req.params` và lọc `{ _id: taskId, 'checklist._id': itemId }`. **Phải đổi đồng thời** frontend về `deleteChecklist(taskId, item._id)` (ghi chú tại `api.jsx`).
+2. **Register mặc định role** (`controller/user.js › register`): mặc định `'User'` thay vì `'Member'` (schema User chỉ có `User|Admin`).
+3. `PUT /task/:id` nên populate `columnId` như `GET /task/:id` để response thống nhất.
+4. (Từ tài liệu, xác nhận qua code) `updateAssigneesPoints` không tồn tại trong `controller/user.js` → cộng điểm khi Done không chạy; `require('../model/Comment')` sai hoa thường (lỗi trên Linux).
+
+## Known Issues
+
+- **KI-26 ✅** đã sửa (màu avatar thống nhất theo user id: TaskCard, Drawer, comments, Projects).
+- **KI-12 (phần còn lại)**: `.checklist-add-btn` không còn được JSX dùng (drawer mới dùng `.drawer-inline-submit`) → không còn ảnh hưởng.
+- **KI-28 (mới, backend)**: register thiếu `role` → 500 (Backend Issues #2).
+- **KI-29 (mới, backend) — KI-CHECKLIST-DELETE-BACKEND**: contract theo tài liệu → 404; frontend giữ lời gọi hiện có (xoá được) — phụ thuộc lỗi backend, cần sửa đồng thời (Backend Issues #1).
+- **KI-30 (mới)**: kéo thả bằng bàn phím không tới được cột đang khuất trong vùng cuộn ngang (giới hạn thư viện); người dùng cuộn board trước hoặc dùng chuột.
+- **KI-31 (mới)**: Board chỉ `join_project` một lần khi mount; nếu socket reconnect, room không được join lại (code có sẵn, chưa kiểm reconnect).
+- **KI-32 (mới)**: `Task.status` (thực tế "pending") **không hiển thị** vì ngữ nghĩa khác tên cột (DEC-038).
+- **KI-33 (mới)**: frontend không xử lý `task_reviewed`.
+- **KI-34 (mới)**: còn inline style: ProjectBoard 11 (modal tạo task — Phase H), MyTasks 11 (danh sách — Phase F).
+- **KI-35 (mới)**: nhiều component vẫn dùng `fetch` trực tiếp (Header, Nav, KPI, AdminUsers, các trang Project đọc currentUser) thay vì `api.jsx`; Phase E chỉ tập trung URL gốc, không đổi luồng.
+- KI-16, KI-17, KI-18, KI-20 không đổi.
+
+## Decisions
+
+- **DEC-035**: Backend xác định bằng bằng chứng nội dung; chạy từ **bản sao** trong thư mục tạm với DB QA cục bộ `teamflow_ui_qa`; dữ liệu QA tạo qua API thật; không sửa/không tạo file trong repo backend; không chạm DB thật.
+- **DEC-036**: Drawer = khung + section dùng chung (`components/task/`), dữ liệu/quyền riêng từng trang (áp dụng DEC-P04).
+- **DEC-037**: Giữ lời gọi `deleteChecklist(itemId)` hiện có (đã kiểm chứng xoá thật) thay vì "sửa" theo tài liệu (sẽ 404); ghi chú rõ ở `api.jsx`; chỉ đổi khi backend sửa.
+- **DEC-038**: Ô chọn sửa `columnId` đổi nhãn "Status" → "Column"; không hiển thị `Task.status` (ngữ nghĩa chưa rõ).
+- **DEC-039**: Một ô sửa tiêu đề duy nhất (bỏ ô "Title" trùng), giữ đúng quyền hiện có của từng trang.
+- **DEC-040**: Realtime cho drawer đi qua bộ listener duy nhất của Board (`syncEvent`); drawer không tự lắng nghe; trường đang gõ dở không bị ghi đè.
+- **DEC-041**: Màu avatar toàn app = `src/utils/avatar.js` với seed **user id** (TaskCard, Drawer, comments, Projects).
+- **DEC-042**: URL backend tập trung ở `src/config/apiConfig.js` (`VITE_API_URL`, `VITE_SOCKET_URL`, `.env.example`); fallback `localhost:3000` chỉ còn ở đó. Đặt ở file `.js` (không phải `api.jsx`) để không vi phạm rule fast-refresh.
+- **DEC-043**: Thông báo lỗi = `message || error || "Lỗi {status}…"`; lỗi mạng hiển thị câu thân thiện (`failureMessage`).
+- **DEC-044**: Trả focus khi đóng drawer: dùng phần tử mở nếu là phần tử thật; nếu là `<body>` (nhấn chuột trên drag handle không focus card) hoặc đã unmount → card theo `data-rfd-draggable-id`; không có thì bỏ qua.
+
+## Next Phase
+
+**Phase F — Projects / MyTasks / Filter consistency** — chỉ bắt đầu khi user cho phép. Đề xuất:
+1. My Tasks: danh sách (11 inline style còn lại), thêm Retry + icon search (KI-18), padding kép (KI-20), dùng `api.jsx` thay `fetch` trực tiếp (KI-35) — giữ nguyên logic lọc tab.
+2. Projects: project card (progress, avatar đã đồng bộ), lỗi số liệu từng project không hiện 0 giả (KI-17), padding kép.
+3. Header/Nav: gom lời gọi `/task/my-task` trùng (DEC-P05 — cần user đồng ý vì chạm luồng dữ liệu).
+4. Không thêm Sort/Assignee/Priority (DEC-024). Backend issues #1–#4 cần chủ backend xử lý trước khi gỡ KI-28/KI-29.
+
 ---
 
 ## Decisions
@@ -962,6 +1162,7 @@ Giữ nguyên DEC-P06. Khi có backend cần chạy: kéo thả chuột + bàn p
 - **DEC-020 (Phase B)**: Trạng thái thu gọn sidebar desktop lưu `localStorage` (tiện ích theo người xem, đọc/ghi bọc try/catch); drawer mobile không lưu.
 - **DEC-022 … DEC-027 (Phase C)**: xem mục *Phase C — COMPLETED › Decisions*.
 - **DEC-024 (xác nhận), DEC-028 … DEC-034 (Phase D)**: xem mục *Phase D — COMPLETED › Decisions*.
+- **DEC-035 … DEC-044 (Phase E)**: xem mục *Phase E — COMPLETED › Decisions*.
 - **DEC-021 (Phase B)**: Menu tài khoản/ lời chào chỉ dùng dữ liệu có thật trong `localStorage.user`; thiếu thì hiển thị trung tính, không dùng tên/email/role giữ chỗ.
 
 ### Chờ user quyết định
@@ -1005,6 +1206,7 @@ Giữ nguyên DEC-P06. Khi có backend cần chạy: kéo thả chuột + bàn p
 | D | `src/pages/Project/board/TaskCard.jsx` | Mới | Task Card component |
 | D | `src/pages/Project/ProjectBoard.jsx` | Sửa | Dùng TaskCard (1699 → 1529 dòng) |
 | D | `src/assets/style/{components,style}.css`, `src/pages/Project/project.css` | Sửa | CSS card, tooltip, avatar tone, KI-12; gỡ rule card cũ |
+| E | xem *Phase E — COMPLETED › Changed Files* | Mới/Sửa | Task Drawer dùng chung, apiConfig/env, avatar util, realtime drawer, URL tập trung |
 
 ---
 
@@ -1056,7 +1258,8 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 | KI-22 | Icon trạng thái cột suy từ tên cột; tên lạ → icon trung tính | Ghi nhận; nên map theo trường trạng thái nếu backend có |
 | KI-23 | ~~Nội dung task card còn inline style~~ | ✅ Đã sửa ở Phase D (TaskCard 0 inline style trình bày) |
 | KI-25 | Chữ viết tắt 2 ký tự trong avatar 20px khá dày khi chồng nhau | Chấp nhận; tuỳ chọn 1 ký tự nếu user muốn |
-| KI-26 | Màu avatar trên card (theo id) chưa đồng bộ với avatar ở drawer/Projects (tím cố định inline) | Phase E/F |
+| KI-26 | ~~Màu avatar chưa đồng bộ~~ | ✅ Đã sửa ở Phase E (`src/utils/avatar.js`, seed = user id) |
+| KI-28…KI-35 | Phát hiện ở Phase E (backend register/checklist delete, kéo bàn phím cột khuất, socket reconnect, Task.status, task_reviewed, inline style còn lại, fetch trực tiếp) | Xem *Phase E — COMPLETED › Known Issues* |
 | KI-27 | Card `role="button"` (dnd) chứa nút Not accept lồng bên trong | Giữ để không phá drag handle toàn card |
 | KI-24 | Tên project dài làm meta header xuống dòng ở tablet (header ~155px) | Chấp nhận (không cắt tên quá sớm) |
 | KI-11 | `api.jsx` nằm ngoài `src/` | Ghi nhận, không di chuyển |
@@ -1065,7 +1268,7 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 
 ## Next Phase
 
-**Phase E — Task Detail Drawer** — chỉ bắt đầu khi user cho phép. Chi tiết đề xuất: xem *Phase D — COMPLETED › Next Phase*.
+**Phase F — Projects / MyTasks / Filter consistency** — chỉ bắt đầu khi user cho phép. Chi tiết đề xuất: xem *Phase E — COMPLETED › Next Phase*.
 
 <details><summary>Đề xuất Phase C trước đây (đã thực hiện)</summary>
 
