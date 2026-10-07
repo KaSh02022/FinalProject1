@@ -7,9 +7,9 @@
 | Mục | Giá trị |
 |---|---|
 | Cập nhật lần cuối | 2026-10-06 |
-| Trạng thái hiện tại | **Phase A, B, C COMPLETED** (2026-10-06). Mọi kiểm thử cần dữ liệu thật: **BLOCKED — requires live backend** |
-| Code đã sửa | Có — xem **Changed Files**. Git: baseline `a9ef6f4`, Phase A `4908de3`, Phase B `88caebf`, Phase C `a5701fe` |
-| Phase triển khai kế tiếp | Phase D — Task Card (**chờ user cho phép**) |
+| Trạng thái hiện tại | **Phase A, B, C, D COMPLETED** (Phase D: 2026-10-07). Mọi kiểm thử cần dữ liệu thật: **BLOCKED — requires live backend** |
+| Code đã sửa | Có — xem **Changed Files**. Git: baseline `a9ef6f4`, Phase A `4908de3`, Phase B `88caebf`, Phase C `a5701fe`, Phase D `1ace444` |
+| Phase triển khai kế tiếp | Phase E — Task Detail Drawer (**chờ user cho phép**) |
 
 ---
 
@@ -480,7 +480,7 @@ Một hệ breakpoint duy nhất (giữ theo `responsive.css`): **sm 640 · md 7
 | A | Design Foundation & CSS Consolidation | ✅ COMPLETED (2026-10-06) |
 | B | App Shell / Sidebar / Header (+ API error state) | ✅ COMPLETED (2026-10-06) — phần cần dữ liệu thật: BLOCKED |
 | C | Project Header + Kanban Board | ✅ COMPLETED (2026-10-06) — phần cần dữ liệu thật: BLOCKED |
-| D | Task Card | ⬜ |
+| D | Task Card | ✅ COMPLETED (2026-10-07) — phần cần dữ liệu thật: BLOCKED |
 | E | Task Detail Drawer | ⬜ |
 | F | Projects / MyTasks / Filter | ⬜ |
 | G | Dashboard | ⬜ |
@@ -771,6 +771,166 @@ Giữ nguyên DEC-P06: không có backend cổng 3000 → mọi nghiệm thu c�
 5. Card: `role="button"`/`tabIndex`, Enter mở drawer.
 6. Nghiệm thu card với dữ liệu thật vẫn **BLOCKED** cho tới khi có backend; Phase D chỉ có thể kiểm bằng build/lint/fixture CSS.
 
+
+
+# Phase D — COMPLETED
+
+> Bắt đầu 2026-10-06, tạm dừng theo yêu cầu user giữa bước QA, hoàn tất 2026-10-07. Commit code: `1ace444`.
+> Phạm vi: **chỉ Task Card**. Không đụng ProjectHeader, BoardToolbar, layout board/cột, Task Drawer, modal, Dashboard, dark mode. Không mock data trong repo.
+
+## Objective
+
+Tách Task Card khỏi `ProjectBoard.jsx` thành component trình bày độc lập, thứ bậc rõ (priority → tiêu đề → meta → tín hiệu hạn → người thực hiện → hành động phụ), dễ đọc, responsive, truy cập được bằng bàn phím; chuyển style trình bày sang CSS/token (KI-23); sửa `.avatar-xs` (KI-12) — **không** đổi hợp đồng `@hello-pangea/dnd` và business logic.
+
+**Phạm vi bộ lọc (user chốt 2026-10-06)**: giữ nguyên Search + Week; không thêm Sort/Assignee/Priority (user gọi là "DEC-025 — Board Filter Scope"; trong tài liệu số đó đã dùng ở Phase C nên ghi nhận là **DEC-024 — đã được user xác nhận**). KI-21 chuyển sang Future Enhancement.
+
+## TaskCard Architecture
+
+**Audit (trước khi sửa)** — chỉ có **một** phiên bản task card (inline ~190 dòng trong `ProjectBoard.jsx`); MyTasks dùng dạng danh sách khác → không trừu tượng hoá chung.
+
+| Trách nhiệm | Ở đâu (sau Phase D) |
+|---|---|
+| `Draggable` (key, `draggableId`, `index`, `isDragDisabled`) | `ProjectBoard` — **không đổi** |
+| Quyền `canDragThisTask`, `showNotAcceptBtn` | `ProjectBoard` — không đổi |
+| `calculateTaskWeekAndStatus` (tuần, Overdue/Expiring/On Track) | `ProjectBoard` — không đổi |
+| Tra tên assignee (`getUserInfo`, `getMemberDisplayName`, `getInitials`) | `ProjectBoard` → truyền `assignees=[{id,name,initials}]` |
+| `handleOpenTaskDrawer`, `handleLeaderDecisionOnTask(e, task, column._id, false)` | `ProjectBoard` → truyền qua `onOpen`, `onNotAccept` |
+| Bố cục, thứ bậc, trạng thái tương tác, bàn phím, a11y | `TaskCard` |
+
+`src/pages/Project/board/TaskCard.jsx` (≈155 dòng) — props:
+
+| Prop | Nguồn |
+|---|---|
+| `task` | task đã tải (title/name, description, priority, checklist) |
+| `dragRef`, `draggableProps`, `dragHandleProps`, `isDragging` | `provided.innerRef`, `provided.draggableProps`, `provided.dragHandleProps`, `snapshot.isDragging` — áp dụng **nguyên vẹn** lên root |
+| `canDrag`, `week`, `points`, `deadlineStatus` | do parent tính |
+| `assignees` | `[{ id, name, initials }]` do parent tính |
+| `onOpen`, `onNotAccept?` | handler của parent; không truyền `onNotAccept` → không có nút |
+
+Vì sao truyền `provided` **tách phần** thay vì cả object: truyền nguyên `provided` làm React Compiler lint coi cả object là ref (do `provided.innerRef` gắn vào `ref=`) và sinh 8 cảnh báo `react(refs)`. Giá trị vẫn đúng là của dnd, chỉ khác cách đặt tên.
+
+`ProjectBoard.jsx`: 1699 → **1529 dòng** (bỏ 191 dòng card inline, thêm `assigneeList` 5 dòng + `<TaskCard/>` 15 dòng).
+
+## Visual Changes
+
+```
+┌──────────────────────────────────┐
+│ ● Urgent                         │  priority-tag (Phase A)
+│ Implement the complete auth…     │  tiêu đề 14px/500, tối đa 3 dòng
+│ Mô tả ngắn hai dòng…             │  chỉ khi có description, tối đa 2 dòng
+│ ▦ W3   ◔ 8 pts   ☑ 2/3           │  meta 12px muted, icon lucide 12px
+│──────────────────────────────────│
+│ ⚠ Overdue         (CS)(QL)(NL)+2 ✕│  tín hiệu hạn | avatar ≤3 +n | Not accept
+└──────────────────────────────────┘
+```
+- **Bỏ badge "On Track"** (DEC-002); tín hiệu hạn **chỉ** khi Overdue (đỏ, `CircleAlert`) hoặc Expiring (amber, `Clock`); tooltip giữ câu cũ ("Task đã quá hạn dự án", "Task sắp hết hạn tuần"). Cách tính hạn **không đổi**.
+- Badge `W{n}` / `{n} pts` màu → meta chữ nhỏ có icon (`CalendarDays`, `Gauge`); thêm checklist `x/y` (`ListChecks`, xanh khi xong) **chỉ khi task có checklist**; mô tả rút gọn **chỉ khi có**. Dữ liệu có sẵn trong model, chỉ là trình bày (không cắt dữ liệu ở backend).
+- Priority dùng `.priority-tag` (Phase A), giữ nguyên giá trị Low/Medium/High/Urgent. **Sửa lỗi nhỏ**: task không có priority trước hiển thị chữ "Medium" nhưng class `priority-undefined` (không màu) → nay chữ và class đều Medium.
+- Avatar: `.avatar .avatar-xs` trong `.avatar-group`, tối đa 3 + "+n" (tooltip liệt kê người còn lại), màu ổn định theo id (6 token `--avatar-tone-*`, chữ trắng đạt tương phản). Thay `.task-assignee-avatar` riêng (inline `gap:'-4px'` không hợp lệ, không giới hạn số).
+- Nút **Not accept**: từ chấm đỏ đặc định vị tuyệt đối (đè lên nội dung, phải chừa `padding-right: 32px`) → `.icon-btn icon-btn-sm` viền nhạt trong footer; hover/focus chuyển đỏ; có active và disabled state (CSS sẵn sàng; hiện không có trạng thái disabled trong logic nên không dùng).
+- Card: nền trắng, viền nhẹ, `--shadow-xs`; hover đổi màu viền + `--shadow-sm` (**không đổi kích thước** — đo được); `:active` nền `--color-bg`; focus ring indigo 2px; `is-dragging` (Phase C) giữ nguyên.
+
+## Accessibility
+
+Đọc mã nguồn `@hello-pangea/dnd` 18.0.1: khi kéo được, `dragHandleProps = { tabIndex: 0, role: 'button', aria-describedby (hướng dẫn kéo), … }`, phím **Space** nhấc card; khi `isDragDisabled` → `dragHandleProps = null` → card khoá **trước đây không focus được bằng bàn phím**.
+- Root card giữ `role`/`tabIndex` của drag handle; card khoá tự có `role="button" tabIndex=0` → mọi card đều Tab tới được.
+- **Enter** luôn mở drawer; **Space** chỉ mở drawer khi card khoá (khi kéo được, Space thuộc về dnd) → không có 2 tương tác bàn phím cạnh tranh. Phím bấm trên nút con bị bỏ qua (`e.target !== e.currentTarget`).
+- `aria-label` của card: tiêu đề + priority + tuần + điểm + checklist + tín hiệu hạn (meta/tín hiệu trực quan `aria-hidden` để không đọc trùng). `aria-describedby` (hướng dẫn kéo của dnd) giữ nguyên.
+- Nút Not accept: `aria-label="Not accept task: {title}"`, tooltip CSS `[data-tooltip]` hiện khi **hover và khi focus bằng bàn phím**; Tab đi từ card sang nút của nó; Enter/click trên nút chỉ gọi `onNotAccept` (handler thật tự `stopPropagation`) và không mở drawer. Nút là phần tử tương tác nên dnd không khởi động kéo từ nó.
+
+## Drag & Drop Preservation
+
+- **Không đổi**: `Draggable` (key, `draggableId`, `index`, `isDragDisabled`), `handleOnDragEnd`, `moveTask` + payload, rollback, quyền, socket, route, data model.
+- Root card nhận `ref={provided.innerRef}`, `{...provided.draggableProps}`, `{...provided.dragHandleProps}`, `style={provided.draggableProps.style}` — không thêm/ghi đè thuộc tính style nào (`transform` của dnd nguyên vẹn).
+- `is-dragging` (Phase C) vẫn dùng thuộc tính CSS `rotate` — đo được `transform: none` từ CSS (không ghi đè transform inline của dnd). `is-drop-target` ở cột giữ nguyên.
+- Khoảng cách card vẫn là margin (Phase C, DEC-026); không thêm animation mới; CSS card không transition `transform`.
+
+## CSS Refactor
+
+- **KI-23 ✅**: card không còn inline style trình bày — trong khu vực card đã gỡ **13 object `style={{…}}` và 18 mã hex**; `TaskCard.jsx` có **0** `style={{…}}` và **0** hex (chỉ còn `style={draggableProps.style}` bắt buộc của dnd). 56 object còn lại trong `ProjectBoard.jsx` thuộc Task Drawer / modal (Phase E/H).
+- `components.css`: gỡ rule card cũ không còn dùng (`.task-card-top/-drag-handle/-title/-labels/-sub-meta/-bottom/-due`, `.label-chip`); thêm `.task-card-head/-title/-desc/-meta/-footer/-end/-signal(.is-overdue/.is-expiring)`, `.task-card-reject`, `.task-card:active`, tooltip dùng chung `[data-tooltip]::after`.
+- `style.css`: token `--avatar-tone-0..5`, class `.avatar-tone-0..5`, `.avatar-overflow.avatar-xs`.
+- `project.css`: gỡ rule chết `.task-card-meta(-item)`, `.task-assignees-group`, `.task-assignee-avatar`; giữ `.due-overdue/.due-today` (MyTasks còn dùng).
+
+## Avatar Fix
+
+- **KI-12 ✅ — nguyên nhân**: `project.css` (nạp **cuối** bundle) có `.avatar { width/height: 32px; font-size: 12px }`; họ avatar ở đó có ghi đè `-sm`, `-lg` nhưng **thiếu `-xs`** → `.avatar-xs` của style.css luôn thua → mọi `.avatar-xs` hiển thị 32px.
+- **Sửa**: thêm `.avatar-xs { 20px / 20px / 10px }` vào họ avatar trong `project.css` (ngay trước `.avatar-sm`), kèm comment giải thích. Không dùng inline style.
+- **Kiểm tra mọi nơi dùng `.avatar-xs`**: Project.jsx (2 chỗ, card project), MyTasks.jsx (drawer), ProjectBoard.jsx (drawer) — **cả 4 đều có inline width/height/fontSize** nên **không đổi hiển thị**; TaskCard là nơi đầu tiên dùng kích thước chuẩn 20px. Specimen diff: chỉ `.avatar.avatar-xs` 32→20px; page dump 13 route × 5 viewport: 0 khác biệt.
+
+## Changed Files
+
+| File | Loại | Ghi chú |
+|---|---|---|
+| `src/pages/Project/board/TaskCard.jsx` | Mới | Component Task Card |
+| `src/pages/Project/ProjectBoard.jsx` | Sửa | Dùng `TaskCard`; `assigneeList`; gỡ import `X` thừa (1699 → 1529 dòng) |
+| `src/assets/style/components.css` | Sửa | CSS nội dung card, nút Not accept, tooltip; gỡ rule card cũ |
+| `src/assets/style/style.css` | Sửa | Token + class avatar tone, `.avatar-overflow.avatar-xs` |
+| `src/pages/Project/project.css` | Sửa | KI-12 (`.avatar-xs`); gỡ rule card/avatar chết |
+
+## Validation
+
+### PASS (đã thực sự kiểm chứng)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `npm run build` | ✅ PASS — JS 944.70 KB (gzip 273.23), CSS 71.58 KB |
+| `npm run lint` | ✅ 0 error, **59 warning** — so theo file+rule với `009af1f` (cuối Phase C): **không có cảnh báo mới**. 9 cảnh báo phát sinh trong lúc làm (8 `react(refs)` do truyền nguyên `provided`, 1 import `X` thừa) đã xử lý |
+| Specimen diff (591 selector × 5 viewport, trước/sau Phase D) | ✅ Chỉ khác ở selector card cũ đã gỡ, rule card/avatar chết trong project.css, và `.avatar.avatar-xs` 32→20px (có chủ đích). **Không có khác biệt ngoài dự kiến** |
+| Page dump (13 route × 5 viewport, 4.985 phần tử) | ✅ **0 khác biệt** — Login/Register/Forgot, Dashboard, MyTasks, Admin, Projects, Sidebar, Header, mobile nav, trạng thái lỗi các trang Project (ProjectHeader/BoardToolbar không render khi backend tắt) |
+| Viewport QA 13 route × 5 viewport + drawer mobile | ✅ Không tràn ngang; hamburger chỉ <768; drawer mở/đóng/khoá cuộn/Esc OK |
+| Data states (backend tắt) | ✅ 6 trang Project vẫn ErrorState + Retry, không header/dữ liệu giả |
+| Shell interaction (30 kiểm tra Phase B) | ✅ 30/30 |
+| **Component TaskCard THẬT render trong trình duyệt QA** (import module từ dev server, React cùng phiên bản `?v=`; props fixture chỉ trong trình duyệt, **không commit**) — 5 viewport | ✅ Toàn bộ kiểm tra PASS: card rộng đều 270/270/254/302/301px trong cột 288/288/272/320/319px, không tràn ngang; avatar 20×20; tối đa 3 avatar + "+2"; tiêu đề ≤3 dòng, mô tả ≤2 dòng; tín hiệu chỉ Overdue/Expiring, không có "On Track"; nút Not accept nằm trong card; priority thiếu → class + chữ Medium; checklist chỉ hiện khi có; `aria-label` đầy đủ; **Enter** mở (card kéo được và khoá); **Space** không mở card kéo được, mở card khoá; Enter/click Not accept chỉ gọi onNotAccept; click card mở; Tab card → nút; tooltip hiện khi focus bàn phím; focus ring 2px; hover đổi màu viền, **không đổi kích thước**; `is-dragging` = `rotate 1.5deg`, `transform: none`; không exception / lỗi console (ngoài lỗi mạng do không có backend) |
+
+Lưu ý: kiểm tra component thật dùng props fixture **chỉ chứng minh trình bày + bàn phím của TaskCard**, không chứng minh dữ liệu, quyền hay kéo thả.
+
+### BLOCKED — requires live backend
+
+| Hạng mục | Trạng thái |
+|---|---|
+| Task card với dữ liệu thật (assignee thật, checklist/mô tả thật, số liệu thật) | ⛔ BLOCKED — requires live backend |
+| Drag & drop thật, `moveTask`, rollback, `isDragDisabled` theo quyền thật, kéo bằng bàn phím (Space) trong `DragDropContext` thật | ⛔ BLOCKED — requires live backend |
+| Not accept thật (`handleLeaderDecisionOnTask` → `moveTask` action `not_accept`) | ⛔ BLOCKED — requires live backend |
+| Task Drawer mở từ card với dữ liệu thật, realtime | ⛔ BLOCKED — requires live backend |
+| SUCCESS DATA STATE của Board trong app | ⛔ SUCCESS DATA STATE — BLOCKED BY BACKEND |
+
+## Backend Blockers
+
+Giữ nguyên DEC-P06. Khi có backend cần chạy: kéo thả chuột + bàn phím (Space nhấc, mũi tên di chuyển, Space thả, Esc huỷ) trên card có quyền; card không có quyền không kéo được nhưng vẫn Tab/Enter mở drawer; Not accept ở cột Done (Leader/Manager) chuyển task về Review; card với nhiều assignee/checklist thật; realtime 2 tab.
+
+## Known Issues
+
+- **KI-12 ✅ đã sửa** (`.avatar-xs`).
+- **KI-23 ✅ đã sửa** (inline style nội dung card).
+- **KI-21 → Future Enhancement**: Sort / Assignee / Priority filter — giữ nguyên phạm vi Search + Week theo quyết định user.
+- **KI-25 (mới)**: Chữ viết tắt 2 ký tự trong avatar 20px khá dày khi 3 avatar chồng nhau (đã giảm độ chồng còn −3px). Chấp nhận theo kích thước thiết kế; có thể dùng 1 ký tự nếu user muốn.
+- **KI-26 (mới)**: Màu avatar tính từ id ở client, không đồng bộ với màu avatar nơi khác (Projects/drawer vẫn tím cố định inline) — đồng bộ ở Phase E/F.
+- **KI-27 (mới)**: Card là `role="button"` (do dnd) chứa nút Not accept bên trong (phần tử tương tác lồng nhau) — giữ để không phá hợp đồng drag handle toàn card; Tab vẫn tới được nút.
+- Còn lại không đổi: KI-16 (workspace tĩnh), KI-17 (project card hiện 0), KI-20 (double padding ngoài Board).
+
+## Decisions
+
+- **DEC-024 — đã được user xác nhận (2026-10-06)**: giữ Board filter = Search + Week; không Sort/Assignee/Priority (user gọi là "DEC-025 — Board Filter Scope"; số DEC-025 trong tài liệu là quyết định layout Kanban của Phase C nên không đánh số lại).
+- **DEC-028 (Phase D)**: `TaskCard` là component trình bày; parent giữ `Draggable`, quyền, cách tính tuần/hạn, tra assignee và mọi handler. Truyền `provided` theo từng phần (`dragRef/draggableProps/dragHandleProps/isDragging`), áp dụng nguyên vẹn.
+- **DEC-029 (Phase D)**: Bàn phím: Enter luôn mở drawer; Space chỉ mở khi card khoá; card khoá tự có `role="button" tabIndex=0`.
+- **DEC-030 (Phase D)**: Hiện mô tả (tối đa 2 dòng) và checklist `x/y` **chỉ khi có dữ liệu**; tiêu đề tối đa 3 dòng (đủ đọc, tiêu đề đầy đủ ở `aria-label` và drawer).
+- **DEC-031 (Phase D)**: Avatar trên card tối đa 3 + "+n", màu ổn định theo id qua token `--avatar-tone-0..5`.
+- **DEC-032 (Phase D)**: Tooltip CSS dùng chung `[data-tooltip]` (hover + focus-visible) cho icon button; luôn kèm `aria-label`.
+- **DEC-033 (Phase D)**: KI-12 sửa bằng `.avatar-xs` trong họ avatar của project.css (không inline); các nơi đang có inline size giữ nguyên.
+- **DEC-034 (Phase D)**: Nút Not accept luôn hiển thị (không chỉ khi hover) để dùng được trên cảm ứng; dạng icon-btn trung tính, chuyển đỏ khi hover/focus.
+
+## Next Phase
+
+**Phase E — Task Detail Drawer** — chỉ bắt đầu khi user cho phép.
+
+Đề xuất:
+1. So sánh 2 bản `TaskDrawer` (`ProjectBoard.jsx` và `MyTasks.jsx`) trước khi trừu tượng hoá (DEC-P04: mặc định chỉ đồng bộ **giao diện**, không gộp logic).
+2. Bố cục: header (priority, trạng thái lưu, đóng) → tiêu đề lớn → thuộc tính 2 cột (Status, Priority, Points, Week, Assignee) → Description → Checklist (thanh tiến độ) → Comments → Activity; chuyển ~56 inline style còn lại của drawer sang CSS/token.
+3. Tương tác: slide-in 200ms (tôn trọng reduced-motion), Esc đóng, focus vào tiêu đề khi mở, trả focus về card khi đóng, `role="dialog" aria-modal aria-labelledby`; mobile full-screen.
+4. Đồng bộ avatar trong drawer với `.avatar` + `--avatar-tone-*` (KI-26).
+5. Giữ nguyên toàn bộ handler (cập nhật field, checklist, comment, xoá task, assignee). Nghiệm thu với dữ liệu thật vẫn **BLOCKED**.
+
 ---
 
 ## Decisions
@@ -801,6 +961,7 @@ Giữ nguyên DEC-P06: không có backend cổng 3000 → mọi nghiệm thu c�
 - **DEC-019 (Phase B)**: Header chỉ hiện ngữ cảnh suy ra từ route (không fetch tên project trong header để tránh API trùng); tên project vẫn ở project header của trang.
 - **DEC-020 (Phase B)**: Trạng thái thu gọn sidebar desktop lưu `localStorage` (tiện ích theo người xem, đọc/ghi bọc try/catch); drawer mobile không lưu.
 - **DEC-022 … DEC-027 (Phase C)**: xem mục *Phase C — COMPLETED › Decisions*.
+- **DEC-024 (xác nhận), DEC-028 … DEC-034 (Phase D)**: xem mục *Phase D — COMPLETED › Decisions*.
 - **DEC-021 (Phase B)**: Menu tài khoản/ lời chào chỉ dùng dữ liệu có thật trong `localStorage.user`; thiếu thì hiển thị trung tính, không dùng tên/email/role giữ chỗ.
 
 ### Chờ user quyết định
@@ -841,6 +1002,9 @@ Giữ nguyên DEC-P06: không có backend cổng 3000 → mọi nghiệm thu c�
 | C | `src/components/project/ProjectHeader.jsx`, `src/pages/Project/board/{BoardToolbar.jsx,BoardColumnHeader.jsx,columnStatus.js}` | Mới | Xem Phase C › Components Added |
 | C | `src/pages/Project/{ProjectBoard,ProjectList,ProjectCalendar,ProjectSetting,ProjectOverview,ProjectChart}.jsx` | Sửa | Dùng ProjectHeader; Board toolbar/cột/drag class |
 | C | `src/assets/style/{layouts,components,responsive}.css`, `src/pages/Project/project.css` | Sửa | Header, board, toolbar, chip, drag states, responsive; bỏ hack chiều cao board |
+| D | `src/pages/Project/board/TaskCard.jsx` | Mới | Task Card component |
+| D | `src/pages/Project/ProjectBoard.jsx` | Sửa | Dùng TaskCard (1699 → 1529 dòng) |
+| D | `src/assets/style/{components,style}.css`, `src/pages/Project/project.css` | Sửa | CSS card, tooltip, avatar tone, KI-12; gỡ rule card cũ |
 
 ---
 
@@ -879,7 +1043,7 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 | KI-08 | Widget dashboard (TodayTask, UCMDeadlines, RecentActivity, TaskCompletion, TeamWorkload, ProjectStatus) chứa dữ liệu mock tĩnh, hiện không được render | Xử lý ở Phase G theo DEC-010 |
 | KI-09 | 65 lint warning có sẵn (set-state-in-effect, exhaustive-deps…) | Không sửa trừ khi chạm đúng dòng đó |
 | KI-10 | **Đính chính (Phase A)**: ảnh Phase 0 chụp bằng `--window-size` của Edge headless (có bề rộng cửa sổ tối thiểu ~500px) nên đã phóng đại lỗi. Đo lại bằng giả lập thiết bị chuẩn: header/avatar/chuông **không** tràn ở 390px; tràn thật nằm **bên trong `.page-content`** (filter bar Board, pill tabs MyTasks, input Setting, Chart, List) | Phase B (shell) + Phase C/F (nội dung từng trang) |
-| KI-12 | `.avatar-xs` hiển thị 32px và `.checklist-add-btn` bị `.btn` đè, do họ `.btn*`/`.avatar*` trong project.css | Phase D/F/H (thay đổi hiển thị có chủ đích) |
+| KI-12 | ~~`.avatar-xs` hiển thị 32px~~ ✅ đã sửa ở Phase D. Phần còn lại: `.checklist-add-btn` bị `.btn` đè (họ `.btn*` trong project.css) | `.avatar-xs` ✅; `.checklist-add-btn` → Phase E/H |
 | KI-13 | ~~Lỗi console `Invalid DOM property class`~~ | ✅ Đã sửa ở Phase B (MainLayout, Dashboard). Các widget dashboard không render (TodayTask…) vẫn dùng `class=` → Phase G |
 | KI-14 | **BLOCKED**: QA Board với dữ liệu thật (kéo thả, task card, drawer, modal tạo task, realtime socket) và nhánh "thành công" của mọi trang trong shell mới | Chờ backend (DEC-P06) |
 | KI-15 | ~~Filter bar của Board có width cố định inline~~ | ✅ Đã sửa ở Phase C (BoardToolbar responsive) |
@@ -888,9 +1052,12 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 | KI-18 | MyTasks đã có thông báo lỗi riêng nhưng chưa có Retry, ô search chưa có icon | Phase F |
 | KI-19 | Nội dung trang Project vẫn thụt lề theo cấu trúc cũ (16 khoảng trắng) sau khi bỏ wrapper — giữ nguyên để diff nhỏ | Ghi nhận (chỉ định dạng) |
 | KI-20 | `.page-content` + `.page-content-inner` / padding inline → padding kép trên một số trang | ◐ Board đã xử lý ở Phase C; các trang khác → Phase F |
-| KI-21 | Board chưa có Sort / Assignee / Priority filter (tính năng mới) | Chờ user quyết (DEC-024) |
+| KI-21 | Board chưa có Sort / Assignee / Priority filter (tính năng mới) | **Future Enhancement** — user giữ phạm vi Search + Week (DEC-024 xác nhận) |
 | KI-22 | Icon trạng thái cột suy từ tên cột; tên lạ → icon trung tính | Ghi nhận; nên map theo trường trạng thái nếu backend có |
-| KI-23 | Nội dung task card còn inline style (badge W/pts/On Track, nút Not Accept, avatar) | Phase D |
+| KI-23 | ~~Nội dung task card còn inline style~~ | ✅ Đã sửa ở Phase D (TaskCard 0 inline style trình bày) |
+| KI-25 | Chữ viết tắt 2 ký tự trong avatar 20px khá dày khi chồng nhau | Chấp nhận; tuỳ chọn 1 ký tự nếu user muốn |
+| KI-26 | Màu avatar trên card (theo id) chưa đồng bộ với avatar ở drawer/Projects (tím cố định inline) | Phase E/F |
+| KI-27 | Card `role="button"` (dnd) chứa nút Not accept lồng bên trong | Giữ để không phá drag handle toàn card |
 | KI-24 | Tên project dài làm meta header xuống dòng ở tablet (header ~155px) | Chấp nhận (không cắt tên quá sớm) |
 | KI-11 | `api.jsx` nằm ngoài `src/` | Ghi nhận, không di chuyển |
 
@@ -898,7 +1065,7 @@ Quan sát thực tế từ ảnh chụp: (1) desktop shell hiển thị đúng; 
 
 ## Next Phase
 
-**Phase D — Task Card** — chỉ bắt đầu khi user cho phép. Chi tiết đề xuất: xem *Phase C — COMPLETED › Next Phase*.
+**Phase E — Task Detail Drawer** — chỉ bắt đầu khi user cho phép. Chi tiết đề xuất: xem *Phase D — COMPLETED › Next Phase*.
 
 <details><summary>Đề xuất Phase C trước đây (đã thực hiện)</summary>
 
