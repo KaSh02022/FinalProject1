@@ -25,8 +25,11 @@ import {
     deleteProject,
     fetchMembersByProject,
     inviteMember,
-    deleteMemberByProject
+    deleteMemberByProject,
+    fetchUsers
 } from '../../../api';
+import InviteCombobox from '../../components/project/InviteCombobox.jsx';
+import { looksLikeEmail, validateProjectDates } from '../../utils/userSuggest.js';
 import { API_BASE_URL, translateBackendMessage } from "../../config/apiConfig.js";
 
 import ProjectHeader from '../../components/project/ProjectHeader.jsx';
@@ -122,6 +125,11 @@ export default function ProjectSetting() {
     const [openInviteModal, setOpenInviteModal] = useState(false);
     const [inviteEmail, setInviteEmail] = useState("");
     const [inviteRole, setInviteRole] = useState("Member");
+    // accounts for the invite suggestions (GET /user) — loaded when the modal opens
+    const [inviteUsers, setInviteUsers] = useState([]);
+    const [inviteUsersState, setInviteUsersState] = useState({ loading: false, error: "" });
+    const [inviteError, setInviteError] = useState("");
+    const [inviting, setInviting] = useState(false);
 
     const [tasks, setTasks] = useState([]);
     const confirm = useConfirm();
@@ -212,6 +220,31 @@ export default function ProjectSetting() {
             loadData();
         }
     }, [projectId]);
+
+    useEffect(() => {
+        if (!openInviteModal) return;
+        let cancelled = false;
+        // loading state is set by openInvite (the click), not here
+        fetchUsers()
+            .then((res) => {
+                if (cancelled) return;
+                setInviteUsers(Array.isArray(res) ? res : (res?.data || res?.users || []));
+                setInviteUsersState({ loading: false, error: "" });
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                console.error("Loading the account suggestions failed:", err);
+                setInviteUsers([]);
+                setInviteUsersState({ loading: false, error: "Suggestions are unavailable — type the exact email address." });
+            });
+        return () => { cancelled = true; };
+    }, [openInviteModal]);
+
+    // dates as stored on the server: an unchanged past start / end date stays valid
+    const savedDates = {
+        startDate: formatDateForInput(project?.startDate || project?.start_date || project?.createdAt),
+        dueDate: formatDateForInput(project?.date || project?.dueDate || project?.endDate),
+    };
 
     const loadData = async () => {
         const failures = [];
@@ -317,27 +350,49 @@ export default function ProjectSetting() {
         }));
     };
 
-    const handleInvite = async () => {
-        if (!inviteEmail.trim()) {
+    const openInvite = () => {
+        setInviteUsersState({ loading: true, error: "" });
+        setOpenInviteModal(true);
+    };
+
+    const closeInviteModal = () => {
+        setOpenInviteModal(false);
+        setInviteEmail("");
+        setInviteRole("Member");
+        setInviteError("");
+    };
+
+    const handleInvite = async (e) => {
+        e?.preventDefault();
+        if (inviting) return;
+        const email = inviteEmail.trim();
+        if (!looksLikeEmail(email)) {
+            setInviteError("Choose an account from the list or type a full email address.");
             return;
         }
 
         try {
+            setInviting(true);
+            setInviteError("");
             await inviteMember({
-                email: inviteEmail,
+                email,
                 role: inviteRole,
                 projectId: projectId
             });
 
-            const refreshedMembers = await fetchMembersByProject(projectId).catch(() => []);
-            const realMembers = Array.isArray(refreshedMembers) ? refreshedMembers : (refreshedMembers?.data || []);
-            setProjectMembers(realMembers);
+            const refreshedMembers = await fetchMembersByProject(projectId).catch(() => null);
+            if (refreshedMembers) {
+                setProjectMembers(Array.isArray(refreshedMembers) ? refreshedMembers : (refreshedMembers?.data || []));
+            }
 
-            setOpenInviteModal(false);
-            setInviteEmail("");
-            setInviteRole("Member");
+            closeInviteModal();
+            notify({ type: 'success', title: 'Member added', message: `${email} joined the project as ${inviteRole}.` });
         } catch (error) {
-            console.error("Lỗi gửi lời mời:", error);
+            console.error("Inviting the member failed:", error);
+            // the modal stays open with what was typed: 404 unknown email, 400 already a member...
+            setInviteError(error?.message || "Couldn't add the member. Please try again.");
+        } finally {
+            setInviting(false);
         }
     };
 
@@ -387,23 +442,11 @@ export default function ProjectSetting() {
         e.preventDefault();
         if (!canManage) return;
 
-        const currentToday = getTodayString();
-
-        if (formData.startDate && formData.startDate < currentToday) {
-            notify({ type: 'error', title: 'The start date cannot be in the past.' });
+        // a project that already started (or ended) stays editable: only a CHANGED date may not be in the past
+        const dateError = validateProjectDates(formData, savedDates, getTodayString());
+        if (dateError) {
+            notify({ type: 'error', title: dateError });
             return;
-        }
-
-        if (formData.dueDate && formData.dueDate < currentToday) {
-            notify({ type: 'error', title: 'The end date cannot be in the past.' });
-            return;
-        }
-
-        if (formData.startDate && formData.dueDate) {
-            if (formData.startDate > formData.dueDate) {
-                notify({ type: 'error', title: 'The start date cannot be after the end date.' });
-                return;
-            }
         }
 
         // empty Budget / Cost per Point = keep the stored value (PUT ignores fields that are not sent)
@@ -611,14 +654,15 @@ export default function ProjectSetting() {
                                                     <input id="settings-start-date"
                                                         type="date"
                                                         className="input"
-                                                        min={getTodayString()}
+                                                        min={savedDates.startDate && savedDates.startDate < todayString ? savedDates.startDate : todayString}
                                                         value={formData.startDate}
                                                         onChange={(e) => {
                                                             const val = e.target.value;
                                                             const currentToday = getTodayString();
-                                                            if (val && val < currentToday) {
+                                                            // the stored start date is kept even when it is already in the past
+                                                            if (val && val < currentToday && val !== savedDates.startDate) {
                                                                 notify({ type: 'error', title: 'The start date cannot be in the past.' });
-                                                                setFormData({ ...formData, startDate: currentToday });
+                                                                setFormData({ ...formData, startDate: savedDates.startDate || currentToday });
                                                             } else {
                                                                 setFormData({ ...formData, startDate: val });
                                                             }
@@ -637,7 +681,7 @@ export default function ProjectSetting() {
                                                         onChange={(e) => {
                                                             const val = e.target.value;
                                                             const minAllowed = formData.startDate || getTodayString();
-                                                            if (val && val < minAllowed) {
+                                                            if (val && val < minAllowed && val !== savedDates.dueDate) {
                                                                 notify({ type: 'error', title: 'The end date cannot be before the start date or today.' });
                                                                 setFormData({ ...formData, dueDate: minAllowed });
                                                             } else {
@@ -743,7 +787,7 @@ export default function ProjectSetting() {
                                             {canManage && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => setOpenInviteModal(true)}
+                                                    onClick={openInvite}
                                                     className="btn btn-primary"
                                                     style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', height: '38px' }}
                                                 >
@@ -921,18 +965,23 @@ export default function ProjectSetting() {
 
             {/* Modal Invite Member */}
             {openInviteModal && (
-                <Modal title="Invite a member" description="Add a new person to this project." size="sm" onClose={() => setOpenInviteModal(false)}>
+                <Modal title="Invite a member" description="Search an existing account by name or email." size="sm" onClose={closeInviteModal}>
+                    <form className="modal-form" onSubmit={handleInvite} noValidate>
                         <div className="modal-body">
                             <div className="field">
-                                <label className="field-label" htmlFor="invite-email">Email *</label>
-                                <input id="invite-email"
+                                <label className="field-label" htmlFor="invite-email">Name or email *</label>
+                                <InviteCombobox
+                                    id="invite-email"
                                     value={inviteEmail}
-                                    onChange={(e) => setInviteEmail(e.target.value)}
-                                    className="input"
-                                    type="email"
-                                    placeholder="teammate@company.com"
-                                    required
+                                    onChange={(value) => { setInviteEmail(value); setInviteError(""); }}
+                                    users={inviteUsers}
+                                    members={projectMembers}
+                                    loadingUsers={inviteUsersState.loading}
+                                    usersError={inviteUsersState.error}
+                                    invalid={Boolean(inviteError)}
+                                    describedBy={inviteError ? "invite-error" : undefined}
                                 />
+                                {inviteError && <p id="invite-error" className="field-error-text" role="alert">{inviteError}</p>}
                             </div>
 
                             <div className="field">
@@ -949,10 +998,15 @@ export default function ProjectSetting() {
                             </div>
                         </div>
                         <div className="modal-footer">
-                            <button type="button" className="btn btn-primary" onClick={handleInvite}>
-                                Add Member
+                            <button type="button" className="btn btn-secondary" onClick={closeInviteModal}>
+                                Cancel
+                            </button>
+                            <button type="submit" className="btn btn-primary" disabled={inviting}>
+                                {inviting && <Loader2 className="icon icon-sm animate-spin" aria-hidden="true" />}
+                                {inviting ? "Adding…" : "Add Member"}
                             </button>
                         </div>
+                    </form>
                 </Modal>
             )}
         </>

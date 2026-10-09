@@ -29,7 +29,8 @@ import { withFallback, failureMessage } from '../../utils/requestState.js';
 import {
     Plus,
     Loader2,
-    Check
+    Check,
+    CalendarClock
 } from "lucide-react";
 
 import ProjectHeader from '../../components/project/ProjectHeader.jsx';
@@ -38,6 +39,7 @@ import BoardToolbar from './board/BoardToolbar.jsx';
 import BoardColumnHeader from './board/BoardColumnHeader.jsx';
 import TaskCard from './board/TaskCard.jsx';
 import { getColumnStatus } from './board/columnStatus.js';
+import { getProjectStart, isMoveLockedForRole, formatDayDMY } from '../../utils/projectSchedule.js';
 import TaskDrawerFrame from '../../components/task/TaskDrawerFrame.jsx';
 import { DrawerSection, ChecklistSection, CommentsSection, ActivitySection, AssigneePicker, UserAvatar } from '../../components/task/TaskDrawerSections.jsx';
 
@@ -736,6 +738,10 @@ export default function ProjectBoard({ projectId: propProjectId }) {
 
     const canCreateTask = isManager || isLeader;
 
+    // Members wait for the project start day before moving tasks (UI rule — the backend does not check it)
+    const moveLocked = isMoveLockedForRole({ isManager, isLeader }, project);
+    const projectStartLabel = formatDayDMY(getProjectStart(project));
+
     const fetchBoardData = async () => {
         if (!activeProjectId) return;
         const failures = [];
@@ -987,6 +993,9 @@ export default function ProjectBoard({ projectId: propProjectId }) {
      * Resolves with the merged task, rejects with the API error.
      */
     const performMove = async (taskId, sourceColumnId, destColumnId, destinationIndex) => {
+        if (moveLocked) {
+            throw new Error(`members can move tasks once the project starts on ${projectStartLabel}`);
+        }
         const id = String(taskId);
         const payload = buildMovePayload(sourceColumnId, destColumnId, destinationIndex);
         const previousTasks = tasks;
@@ -1200,6 +1209,12 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                         canCreateTask={canCreateTask}
                         onCreateTask={() => handleOpenCreateModal('', false)}
                     />
+                    {moveLocked && (
+                        <p className="board-notice" role="status">
+                            <CalendarClock className="icon icon-sm" aria-hidden="true" />
+                            This project starts on {projectStartLabel}. Members can move their tasks from that day.
+                        </p>
+                    )}
 
                     <DragDropContext onDragEnd={handleOnDragEnd}>
                         <div className="board scroll-x" id="kanbanBoard">
@@ -1242,7 +1257,7 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                                                                 const assigneeId = typeof a === 'object' ? String(a._id || a.id) : String(a);
                                                                 return currentUserId && assigneeId === String(currentUserId);
                                                             });
-                                                            const canDragThisTask = isManager || isLeader || isTaskAssignee;
+                                                            const canDragThisTask = isManager || isLeader || (isTaskAssignee && !moveLocked);
 
                                                             const { displayWeek, status } = calculateTaskWeekAndStatus(task, project);
                                                             const assigneeList = assignees.map((assignee, aIdx) => {

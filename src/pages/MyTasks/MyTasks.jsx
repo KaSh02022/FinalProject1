@@ -22,6 +22,7 @@ import ErrorState from "../../components/common/ErrorState.jsx";
 import { failureMessage } from "../../utils/requestState.js";
 import TaskDrawerFrame from "../../components/task/TaskDrawerFrame.jsx";
 import { DrawerSection, ChecklistSection, CommentsSection, ActivitySection, AssigneePicker, UserAvatar } from "../../components/task/TaskDrawerSections.jsx";
+import MyTaskInsights from "./Insights/MyTaskInsights.jsx";
 
 // --- HELPER FUNCTIONS ---
 const calculateDueDateByWeek = (startDateStr, weekNum = 1) => {
@@ -784,7 +785,8 @@ function MyTasks() {
             const matchesSearch = !searchQuery || title.includes(searchQuery.toLowerCase());
             if (!matchesSearch) return false;
 
-            if (activeTab === "all") return true;
+            // Insights summarises every task matching the search
+            if (activeTab === "all" || activeTab === "insights") return true;
 
             // completion is the backend's task.status (set by PUT /task/:id/move), not the column name
             const isDone = isTaskCompleted(task);
@@ -824,6 +826,17 @@ function MyTasks() {
             return true;
         });
     }, [tasks, activeTab, searchQuery, projectMap]);
+
+    // same due date as the list: task.dueDate, otherwise the end of its project week
+    const getTaskDueDate = useCallback((task) => {
+        const projId = typeof task.projectId === 'object' ? (task.projectId?._id || task.projectId?.id) : task.projectId;
+        const projStartDate = (typeof task.projectId === 'object' && task.projectId?.startDate)
+            ? task.projectId?.startDate
+            : projectMap[projId]?.startDate;
+        return task.dueDate || calculateDueDateByWeek(projStartDate, task.week || 1);
+    }, [projectMap]);
+
+    const showInsights = activeTab === "insights";
 
     return (
         <>
@@ -889,9 +902,21 @@ function MyTasks() {
                         >
                             Completed
                         </button>
+                        <button
+                            type="button"
+                            aria-pressed={showInsights}
+                            className={`pill-tab ${showInsights ? "active" : ""}`}
+                            onClick={() => setActiveTab('insights')}
+                        >
+                            Insights
+                        </button>
                     </div>
 
-                    {!loading && !error && filteredTasks.length > 0 && (
+                    {!loading && !error && showInsights && (
+                        <MyTaskInsights tasks={filteredTasks} getDueDate={getTaskDueDate} searchQuery={searchQuery.trim()} />
+                    )}
+
+                    {!loading && !error && !showInsights && filteredTasks.length > 0 && (
                         <div className="card my-tasks-list">
                             {filteredTasks.map((task) => {
                                 const totalChecklist = task.checklist?.length || 0;
@@ -981,7 +1006,7 @@ function MyTasks() {
                         />
                     )}
 
-                    {!loading && !error && filteredTasks.length === 0 && (
+                    {!loading && !error && !showInsights && filteredTasks.length === 0 && (
                         <div className="card">
                             <div className="empty-state my-tasks-empty">
                                 <span className="empty-state-icon" aria-hidden="true">

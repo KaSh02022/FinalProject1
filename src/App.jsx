@@ -18,6 +18,7 @@ import ForgetPassword from './pages/ForgetPassword/ForgetPassword.jsx'
 import ResetPassword from './pages/ForgetPassword/ResetPassword/ResetPassword.jsx'
 import ProjectOverview from "./pages/Project/ProjectOverview.jsx";
 import ProjectChart from "./pages/Project/ProjectChart.jsx";
+import ProjectTimeline from "./pages/Project/ProjectTimeline.jsx";
 import ConfirmProvider from "./components/common/ConfirmProvider.jsx";
 import Notifier from "./components/common/Notifier.jsx";
 import { notify } from "./utils/notify.js";
@@ -68,6 +69,7 @@ function App() {
                     <Route path = "/projectsetting/:id" element = {<ProjectSetting/>}/>
                     <Route path = "/projectoverview/:id" element = {<ProjectOverview/>}/>
                     <Route path = "/projectchart/:id" element = {<ProjectChart/>}/>
+                    <Route path = "/projecttimeline/:id" element = {<ProjectTimeline/>}/>
                 </Route>
                 <Route path = "/login" element={<Login/>}/>
                 <Route path = "/register" element={<Register/>}/>

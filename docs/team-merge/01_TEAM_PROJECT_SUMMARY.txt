@@ -1,0 +1,95 @@
+TỔNG HỢP DỰ ÁN FRONTEND CỦA NHÓM (BẢN NHÁNH)
+=============================================
+Ngày đọc: 2026-10-09
+Thư mục: C:\Users\ASUS\Downloads\EprojectReactJs-main (1)\EprojectReactJs-main
+Không có .git, không có tài liệu (chỉ README mặc định của Vite).
+
+1. NGUỒN GỐC BẢN NHÁNH
+----------------------
+Đối chiếu từng file (bỏ qua khác biệt CRLF/khoảng trắng) với lịch sử git của dự án gốc
+D:\Study\Aptech\EprojectReactJs:
+- Bản nhóm được tách từ commit a9ef6f4 "chore: baseline before ui ux upgrade" (2026-10-06),
+  tức TRƯỚC toàn bộ Phase A–F, Final pass và đợt đồng bộ backend 7ab7c6e của dự án gốc.
+- 41/54 file giống hệt baseline. Chỉ 13 file bị nhóm sửa/thêm:
+    .gitignore, api.jsx, package.json, src/App.jsx,
+    src/pages/Dashboard/Dasboard.jsx, src/pages/Dashboard/KPI/KPI.jsx,
+    src/pages/Dashboard/ProjectProgress/Budgetusage.jsx (MỚI),
+    src/pages/MyTasks/MyTasks.jsx, src/pages/Project/Project.jsx,
+    src/pages/Project/ProjectBoard.jsx, src/pages/Project/ProjectList.jsx,
+    src/pages/Project/ProjectOverview.jsx, src/pages/Project/ProjectSetting.jsx
+- Vì tách từ baseline, bản nhóm KHÔNG có: design system/CSS hợp nhất, app shell mới,
+  ProjectHeader, TaskCard/TaskDrawer mới, ConfirmProvider/notify/Modal/ErrorState,
+  PUT /task/:id/move, Epic Burndown, unit test... (còn window.confirm/alert, inline style).
+
+2. CÔNG NGHỆ
+------------
+React 19 + Vite 8, react-router-dom 7, @hello-pangea/dnd, socket.io-client, recharts, lucide-react.
+package.json thêm so với baseline (KHÔNG được import ở đâu trong src):
+  frappe-gantt, frappe-gantt-react, joi, kill-port (dev), sass-embedded (dev)
+.gitignore: bỏ các dòng .qa/, qa-screenshots/, *.tmp, .env, .env.*
+Routes: giống baseline + "/gantchart/:id" (trỏ tới ProjectCalendar — chưa có Gantt thật).
+
+3. CHI TIẾT TÍNH NĂNG NHÓM ĐÃ THÊM
+----------------------------------
+[T1] Dashboard viết lại (Dasboard.jsx, ~530 dòng, recharts + class Tailwind không có trong dự án):
+  - KPI + BudgetUsage ở đầu trang. Tiêu đề cứng "Welcome back, Cao".
+  - "Project Progress (%)": biểu đồ thanh ngang, mỗi project = số task ở cột position 3 / tổng task.
+  - "Weekly Progress Overview": chọn project, LineChart expectancy vs realProgress từ
+    GET /task/project/:id/weekly-expectancy (connectNulls=true → nối qua tuần chưa tới).
+  - "Resource Allocation (Task Distribution)": bảng mỗi người: role, Active / Done / Total task,
+    gộp từ fetchMembersByProject + assignees của mọi task mọi project.
+  - Done xác định bằng columnId.position === 3 (không dùng task.status).
+
+[T2] Budget Usage (ProjectProgress/Budgetusage.jsx — MỚI, ~285 dòng):
+  - Đọc budget, costPerPoint của project + task (point) của từng project.
+  - Đã dùng = điểm task Done x costPerPoint; nếu chưa đặt costPerPoint thì ƯỚC TÍNH = budget x tỉ lệ
+    hoàn thành (không bao giờ vượt budget).
+  - Ngưỡng màu: <80% xanh, 80–100% vàng, >100% đỏ ("Over budget"); ẩn project budget = 0.
+  - Chế độ "All projects": thanh xếp chồng % từng project; chọn 1 project: donut + ô số liệu
+    (Budget, Used, Remaining/Over by, Points done x/y, Cost per point).
+
+[T3] KPI (KPI.jsx):
+  - Total Projects + Total Budget lấy từ GET /project/portfolio (fetchPortfolio mới trong api.jsx).
+  - "On-Time Rate" TỰ TÍNH ở client: với mỗi project gọi weekly-expectancy, lấy tuần hiện tại,
+    rate = min(100, real/plan x 100); plan = 0 → 100; lỗi tải hoặc không có tuần → tính là 100;
+    trung bình các project.
+  - Loading "Đang tải số liệu hệ thống..." (tiếng Việt), không có trạng thái lỗi.
+
+[T4] Budget / Cost per point ở form tạo project (Project.jsx) và Settings (ProjectSetting.jsx):
+  - Ô số min=0; gửi Number(x)||0 (ô trống gửi 0 → ghi đè giá trị cũ khi sửa).
+
+[T5] ProjectSetting.jsx:
+  - Invite Member có AUTOCOMPLETE: mở modal thì gọi fetchUsers (GET /user), gõ tên/email để lọc,
+    loại người đã là thành viên, click gợi ý để điền email; click ra ngoài đóng gợi ý.
+    (Dropdown inline style, không hỗ trợ bàn phím ↑/↓/Enter, không có aria.)
+  - Bỏ chặn "Start date không được trong quá khứ" → project đã bắt đầu vẫn lưu được Settings;
+    min của ô ngày cho phép giữ ngày bắt đầu cũ.
+  - Dịch chuỗi giao diện sang tiếng Anh (vẫn dùng window.confirm/alert).
+
+[T6] ProjectBoard.jsx:
+  - isProjectStarted: so ngày hôm nay với project.startDate (fallback createdDate/createdAt).
+  - Member (không phải Manager/Leader) CHỈ kéo thả được task của mình KHI project đã bắt đầu;
+    chặn thêm trong hàm xử lý move bằng alert tiếng Việt.
+  - Thêm tab "gancchart" → /gantchart/:id (thực chất mở Calendar).
+
+[T7] MyTasks.jsx:
+  - Thêm tab "Chart": thống kê số task theo To do / In progress / Review / Done (đoán theo tên cột
+    hoặc position), cột CSS inline + phần trăm + thẻ chú giải. Lọc theo ô tìm kiếm.
+  - Dịch chuỗi/console sang tiếng Anh; xóa task vẫn dùng window.confirm.
+
+[T8] ProjectList.jsx: thêm handleDeleteTask (window.confirm + alert) — sửa lỗi nút xóa backlog
+     không hoạt động ở baseline.
+
+[T9] api.jsx: thêm fetchWeeklyExpectancy (message lỗi tiếng Việt) và fetchPortfolio.
+
+[T10] ProjectOverview.jsx: đổi chuỗi fallback mô tả ("No description").
+
+4. NHẬN XÉT CHẤT LƯỢNG (để cân nhắc khi bổ sung vào bản gốc)
+------------------------------------------------------------
+- Done = cột position 3: sai với contract backend (task.status === "completed" do PUT /move đặt).
+- Budget ước tính theo tỉ lệ khi chưa có costPerPoint → con số "Used" là giả định, dễ hiểu nhầm.
+- On-Time Rate coi lỗi/thiếu dữ liệu là 100% → số liệu "đẹp" không phản ánh thực tế.
+- connectNulls nối đường Real Progress qua các tuần chưa diễn ra.
+- Không loading/error/empty state thống nhất; nhiều inline style, class Tailwind không có hiệu lực.
+- Gantt chỉ là link sang Calendar; 5 dependency thêm vào không dùng.
+- Hạn chế bắt đầu project chỉ chặn ở client (backend moveTask không kiểm tra startDate).

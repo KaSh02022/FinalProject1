@@ -1,0 +1,151 @@
+GHI NHỚ: SO SÁNH BẢN NHÓM ↔ BẢN GỐC & PHƯƠNG ÁN BỔ SUNG
+=========================================================
+Ngày: 2026-10-09
+Bản gốc : D:\Study\Aptech\EprojectReactJs (main, HEAD 7e43872 + thay đổi đồng bộ backend 7ab7c6e)
+Bản nhóm: C:\Users\ASUS\Downloads\EprojectReactJs-main (1)\EprojectReactJs-main
+Tài liệu bản gốc đã đối chiếu:
+  - docs/ui-ux/UI_UX_UPGRADE_MASTER.md (Phase A–F + Final, Known Issues, Decisions)
+  - docs/FRONTEND_BACKEND_SYNC_IMPLEMENTATION.md (đồng bộ backend 7ab7c6e)
+Chi tiết bản nhóm: docs/team-merge/01_TEAM_PROJECT_SUMMARY.txt
+
+Ký hiệu: [CÓ] bản gốc đã có (thường tốt hơn) · [THIẾU] bản gốc chưa có · [LỖI GỐC] bản gốc đang sai,
+bản nhóm đã sửa · [BỎ] không đưa vào (lý do ghi kèm)
+
+A. BẢNG ĐỐI CHIẾU
+-----------------
+ #  | Nội dung nhóm thêm                          | Bản gốc                                   | Kết luận
+----+---------------------------------------------+-------------------------------------------+-----------
+ T1a| Dashboard: Project Progress (%) theo project| Không có                                  | [THIẾU]
+ T1b| Dashboard: Weekly Progress (plan vs real)   | WeeklyExpectancy "Plan vs. Real" + parser,| [CÓ]
+    |                                             | test, null = khoảng trống, socket refetch |
+ T1c| Dashboard: Resource Allocation (task/người) | TeamWorkload là mock, đang ẩn             | [THIẾU]
+ T1d| "Welcome back, Cao" cứng                    | Lấy tên từ localStorage                   | [CÓ]
+ T2 | Budget Usage (điểm Done x costPerPoint)     | Không (tài liệu sync ghi "không tính chi  | [THIẾU]
+    |                                             | phí vì backend không có công thức")       |
+ T3a| KPI Total Projects + Total Budget           | Có (portfolio, có error/retry)            | [CÓ]
+ T3b| KPI On-Time Rate tự tính từ weekly-expect.  | Ẩn onTimeRate (backend đếm "done" sai)    | [THIẾU] (làm lại trung thực)
+ T4 | Budget / Cost per point khi tạo + Settings  | Có (projectFinance + test, ô trống không  | [CÓ]
+    |                                             | ghi đè)                                   |
+ T5a| Invite member autocomplete (GET /user)      | Chỉ ô nhập email tay; lỗi mời chỉ log      | [THIẾU]
+ T5b| Cho phép giữ Start date đã qua khi lưu      | handleSaveGeneralSettings chặn mọi start  | [LỖI GỐC]
+    |                                             | date < hôm nay → project đã bắt đầu KHÔNG |
+    |                                             | THỂ lưu Settings (kể cả chỉ đổi tên)      |
+ T6a| Member không kéo task trước ngày bắt đầu    | Không có                                  | [THIẾU]
+ T6b| Tab "gancchart" → Calendar                  | Không                                     | [THIẾU] ý tưởng Gantt (làm thật)
+ T7 | My Tasks tab Chart (thống kê theo trạng thái)| Không                                    | [THIẾU]
+ T8 | Xóa task ở Backlog                          | Có (deleteConfirm + DELETE)               | [CÓ]
+ T9 | api fetchWeeklyExpectancy / fetchPortfolio  | Có (qua handleResponse, lỗi có status)    | [CÓ]
+ T10| Dịch tiếng Anh                              | Có (toàn bộ + map message backend)        | [CÓ]
+ -- | Dependency frappe-gantt(-react), joi,       | —                                         | [BỎ] không file nào import
+    | kill-port, sass-embedded                    |                                           |
+ -- | .gitignore bỏ .env/.qa                      | —                                         | [BỎ] làm lộ file môi trường
+ -- | window.confirm/alert, inline style, Tailwind| ConfirmProvider, notify, design token     | [BỎ]
+
+B. NGUYÊN TẮC KHI BỔ SUNG (giữ chuẩn bản gốc)
+---------------------------------------------
+1. Không sửa backend, không thêm dependency (recharts, lucide-react đã có).
+2. "Hoàn thành" = task.status === "completed" (contract §7, isTaskCompleted) — KHÔNG dùng
+   column position 3 như bản nhóm.
+3. Không bịa số: lỗi tải ≠ 100%, thiếu costPerPoint ≠ ước tính; hiển thị "—"/"Not set" kèm lý do.
+4. Logic tính toán đặt trong utils thuần + unit test (node:test) như taskMove/weeklyExpectancy.
+5. Giao diện dùng component/token sẵn có: ChartCard, ChartStats, LoadingBlock, EmptyBlock,
+   ErrorState, notify, Modal; không inline màu hex mới ngoài palette chartTheme.
+6. Có loading / empty / error + Retry; responsive 375–1440; có nhãn aria.
+
+C. PHƯƠNG ÁN NÂNG CẤP (thực hiện theo thứ tự)
+---------------------------------------------
+M1 — Project Settings (T5a, T5b)
+  - Sửa [LỖI GỐC]: chỉ chặn start date trong quá khứ khi người dùng ĐỔI nó; giữ nguyên ngày cũ
+    thì lưu được. min của ô ngày cho phép ngày cũ. End date vẫn không được trước start date.
+  - Invite: combobox gợi ý người dùng (GET /user — backend trả user không kèm password), lọc theo
+    tên/email, loại thành viên hiện có và tài khoản bị khóa; điều khiển bàn phím ↑/↓/Enter/Esc,
+    role="combobox"/"listbox"/aria-activedescendant; avatar + tên + email; vẫn cho gõ email tay.
+    Lỗi mời hiển thị trong modal (trước: chỉ console.error), toast khi thành công.
+    Lọc gợi ý bằng util thuần utils/userSuggest.js + test.
+
+M2 — Board: khóa thao tác của Member trước ngày bắt đầu (T6a)
+  - utils/projectSchedule.js: hasProjectStarted(project, today) (+ test).
+  - Member (không phải Manager/Leader) chưa được kéo/chuyển cột task trước startDate:
+    card khóa (dùng trạng thái is-locked sẵn có), toolbar hiện ghi chú "Project starts on DD/MM/YYYY
+    — members can move tasks from that day", chặn trong performMove bằng notify (không alert).
+  - Ghi rõ: đây là quy tắc giao diện, backend chưa kiểm tra.
+
+M3 — My Tasks: tab "Insights" (T7, nâng cấp)
+  - Thống kê theo trạng thái: Completed lấy theo task.status; còn lại theo loại cột
+    (getColumnStatus dùng chung với Board: To do / In progress / Review / Other) + Overdue,
+    Due soon, tổng point. Thanh ngang CSS theo token màu trạng thái, có số & %.
+  - Tôn trọng ô tìm kiếm; util thuần utils/myTaskStats.js + test.
+
+M4 — Dashboard "Portfolio health" (T1a, T1c, T2, T3b)
+  - Một lần tải: GET /project + GET /task/project/:id cho từng project (+ weekly-expectancy);
+    lỗi từng project được đếm và báo, không tính thành 0/100.
+  - Project Progress: % task completed (theo status) + points completed/total.
+  - Budget burn: Spent = điểm completed x costPerPoint, so với budget; ngưỡng <80% / 80–100% / >100%.
+    Project có budget nhưng chưa đặt costPerPoint → hiện "Cost per point not set" (KHÔNG ước tính).
+  - Team workload: mỗi người (assignee đã populate): Active, Completed, Total, Points đang làm.
+  - Plan adherence (thay On-Time Rate): tuần hiện tại, real/plan (giới hạn 100%), chỉ tính project
+    có plan > 0; hiện số project được tính; không có dữ liệu → "—".
+  - utils/portfolioStats.js + test.
+
+M5 — Timeline (Gantt theo tuần) thay cho link "gancchart" giả (T6b)
+  - Route /projecttimeline/:id + tab "Timeline" trong ProjectHeader.
+  - Task không có ngày bắt đầu/kết thúc, chỉ có week (số tuần tính từ project.startDate) →
+    Gantt theo tuần: cột = Week 1..N (N = tuần của dueDate hoặc tuần lớn nhất của task), hàng = task,
+    ô thanh ở tuần của task, màu theo trạng thái, đánh dấu tuần hiện tại; nhóm theo tuần; lọc theo
+    người thực hiện; click mở Board. Không dùng frappe-gantt (không thêm dependency).
+  - utils/timeline.js + test.
+
+D. KIỂM THỬ BẮT BUỘC SAU KHI LÀM
+--------------------------------
+npm test (unit), npm run lint (không thêm lỗi), npm run build. Không chạy được backend thật trong
+phiên này thì ghi "chưa kiểm chứng với backend" — không ghi PASS.
+
+E. TIẾN ĐỘ — HOÀN THÀNH M1–M5 (2026-10-09)
+-----------------------------------------
+M1 ✅ Project Settings
+   - utils/userSuggest.js (+test): suggestInvitees, looksLikeEmail, validateProjectDates.
+   - components/project/InviteCombobox.jsx: combobox ARIA, ↑/↓/Enter/Esc, avatar + tên + email,
+     danh sách nằm trong luồng (không bị modal cắt). Modal.jsx: Esc khi list đang mở chỉ đóng list.
+   - ProjectSetting.jsx: form submit (Enter), nút Cancel, trạng thái "Adding…", lỗi backend hiện trong
+     modal (404 "No account is registered with this email.", 400 đã là thành viên), toast khi thành công.
+     Lỗi tải GET /user → vẫn mời được bằng email gõ tay.
+   - [LỖI GỐC đã sửa] Ngày bắt đầu/kết thúc đã qua mà KHÔNG đổi → lưu được; đổi sang ngày quá khứ khác
+     → vẫn bị chặn.
+M2 ✅ Board — utils/projectSchedule.js (+test). Member chưa được kéo/chuyển cột trước ngày bắt đầu:
+   card khóa, thông báo "This project starts on DD/MM/YYYY…", performMove từ chối (drawer hiện lý do).
+   Manager/Leader không bị ảnh hưởng. Quy tắc giao diện — backend chưa kiểm tra.
+M3 ✅ My Tasks tab "Insights" — utils/myTaskStats.js (+test), pages/MyTasks/Insights/MyTaskInsights.jsx:
+   Tasks / Completed % / Overdue / Due in 2 days / Story points; thanh theo trạng thái (màu token board);
+   tiến độ theo project; theo ô tìm kiếm; không gọi thêm API.
+M4 ✅ Dashboard "Portfolio health" — utils/portfolioStats.js (+test), pages/Dashboard/portfolio/
+   PortfolioOverview.jsx: Project progress, Budget burn (đặt giữa KPI và Project analytics),
+   Team workload, Plan adherence (thay On-Time Rate). Project thiếu cost per point → link
+   "Set cost per point", không ước tính. Project lỗi tải task → báo + Retry, không tính 0.
+M5 ✅ Timeline — utils/timeline.js (+test), pages/Project/ProjectTimeline.jsx, route
+   /projecttimeline/:id, tab "Timeline" (ProjectHeader) + breadcrumb (Header). Lưới theo tuần, tuần hiện
+   tại tô nền, task chưa xong quá tuần kế hoạch kéo dài tới tuần hiện tại (sọc + viền đỏ), lọc người,
+   ẩn completed, cuộn ngang trong card. Không thêm frappe-gantt.
+CSS: thêm vào cuối src/assets/style/components.css (combobox, board-notice, status bars, portfolio,
+   timeline) — chỉ dùng token sẵn có. Sửa: <span class="progress-bar(-fill)"> cần display:block.
+
+KIỂM THỬ (đã chạy thật)
+- npm test: 68/68 PASS (trước 34 → +34: userSuggest 8, projectSchedule 6, myTaskStats 4,
+  portfolioStats 10, timeline 6).
+- npm run lint: 0 lỗi, 43 cảnh báo (trước 44; không có cảnh báo mới — so theo file+rule).
+- npm run build: OK (cảnh báo chunk > 500 kB có sẵn).
+- Browser QA: Chrome headless + CDP, backend origin/main 7ab7c6e (git archive ra scratchpad),
+  MongoDB local DB "teamflow_merge_qa", dữ liệu tạo qua API thật (qa.manager / qa.member / qa.leader /
+  qa.outsider @merge.test, mật khẩu QaPass123!) → 31/31 PASS:
+  D1–D7 dashboard (số liệu đúng: Alpha 2/6=33%, 13 pts × $100 = $1,300/$5,000 = 26%; Beta "Set cost per
+  point"; Gamma không budget bị ẩn; workload Minh 4/29/2/6; 375/768/1440 không tràn ngang),
+  S1–S7 settings + invite (lưu với start date đã qua, chặn đổi sang ngày quá khứ, gợi ý loại thành
+  viên, bàn phím, 404 dịch tiếng Anh, thêm thành công, Esc), B1–B3 board lock, I1–I3 insights,
+  T1–T4 timeline, G1 không có window.alert/confirm, G2 không lỗi console ngoài 404 cố ý.
+
+CÒN LẠI / GHI CHÚ
+- Quy tắc "member chờ ngày bắt đầu" chỉ ở frontend; gọi API trực tiếp vẫn move được (cần backend).
+- GET /user không yêu cầu đăng nhập (backend) — frontend chỉ dùng để gợi ý, không hiển thị gì nhạy cảm
+  (backend đã bỏ password).
+- Plan adherence dựa trên weekly-expectancy: tuần hiện tại tính theo backend; project chưa có kế hoạch
+  (expectancy 0) không được tính vào trung bình.
+- Dependency của bản nhóm (frappe-gantt, joi, kill-port, sass-embedded) KHÔNG thêm vào.

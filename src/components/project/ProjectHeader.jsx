@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
     BarChart2,
     Calendar,
+    ChartGantt,
     CalendarRange,
     Info,
     LayoutGrid,
@@ -19,6 +20,7 @@ const PROJECT_TABS = [
     { path: "/projectboard", label: "Board", Icon: LayoutGrid },
     { path: "/projectlist", label: "Backlog", Icon: List },
     { path: "/projectcalendar", label: "Calendar", Icon: Calendar },
+    { path: "/projecttimeline", label: "Timeline", Icon: ChartGantt },
 ];
 
 /**

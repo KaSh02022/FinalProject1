@@ -1,5 +1,6 @@
 import KPI from "./KPI/KPI";
 import ProjectAnalytics from "./analytics/ProjectAnalytics";
+import PortfolioOverview from "./portfolio/PortfolioOverview";
 
 // Name of the signed-in user as stored by the login page ("" when unknown — never a made-up name)
 const getStoredUserName = () => {
@@ -25,6 +26,7 @@ function Dashboard() {
                 </div>
 
                 <KPI />
+                <PortfolioOverview />
                 <ProjectAnalytics />
             </div>
         </main>

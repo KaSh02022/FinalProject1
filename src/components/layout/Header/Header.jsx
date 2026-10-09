@@ -25,6 +25,7 @@ const ROUTE_CONTEXT = [
     { prefix: "/projectboard", title: "Board", parent: "Projects" },
     { prefix: "/projectlist", title: "Backlog", parent: "Projects" },
     { prefix: "/projectcalendar", title: "Calendar", parent: "Projects" },
+    { prefix: "/projecttimeline", title: "Timeline", parent: "Projects" },
     { prefix: "/projectsetting", title: "Settings", parent: "Projects" },
     { prefix: "/project", title: "Projects" },
 ];

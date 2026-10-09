@@ -28,6 +28,8 @@ function Modal({ title, description, onClose, size = "md", children }) {
 
         const onKeyDown = (e) => {
             if (e.key === "Escape") {
+                // an open combobox list inside the modal closes first (its own handler), the modal stays
+                if (e.target?.getAttribute?.("aria-expanded") === "true") return;
                 e.stopPropagation();
                 e.preventDefault();
                 onCloseRef.current();
