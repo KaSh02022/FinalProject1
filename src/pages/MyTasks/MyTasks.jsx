@@ -12,10 +12,12 @@ import {
     fetchColumnsByProject,
     fetchMembersByProject,
     fetchProjectById,
-    fetchMyTasks
+    fetchMyTasks,
+    moveTask
 } from "./../../../api.jsx";
+import { applyMoveToColumns, buildMovePayload, getDestinationIndex, mergeMovedTask, isTaskCompleted } from '../../utils/taskMove.js';
 import { CheckSquare, ClipboardList, Loader2, Search } from "lucide-react";
-import { useConfirm } from "../../components/common/confirmContext.js";
+import { useConfirm, deleteConfirm } from "../../components/common/confirmContext.js";
 import ErrorState from "../../components/common/ErrorState.jsx";
 import { failureMessage } from "../../utils/requestState.js";
 import TaskDrawerFrame from "../../components/task/TaskDrawerFrame.jsx";
@@ -37,9 +39,9 @@ const calculateDueDateByWeek = (startDateStr, weekNum = 1) => {
 
 // Tính số ngày còn lại theo startDate của Project và week của Task
 const getRemainingDaysLabel = (startDateStr, weekNum = 1) => {
-    if (!startDateStr) return "Chưa đặt";
+    if (!startDateStr) return "Not set";
     const startDate = new Date(startDateStr);
-    if (isNaN(startDate.getTime())) return "Chưa đặt";
+    if (isNaN(startDate.getTime())) return "Not set";
 
     const currentWeek = Math.max(1, Number(weekNum) || 1);
     const daysToAdd = (currentWeek * 7) - 1;
@@ -310,6 +312,38 @@ function TaskDrawer({
         }
     };
 
+    // Changing the column is a move (PUT /task/:id/move): only that endpoint sets status / completedAt /
+    // completedDate and the column order. The task goes to the end of the destination column.
+    const handleColumnChange = async (destColumnId) => {
+        if (!task || isSaving) return;
+        const sourceColumnId = extractColumnId(task.columnId);
+        if (!destColumnId || destColumnId === sourceColumnId) return;
+        const destColumn = columns.find(c => String(c._id) === String(destColumnId));
+        const payload = buildMovePayload(sourceColumnId, destColumnId, getDestinationIndex(destColumn, taskId));
+        const previousTask = task;
+        const previousColumns = columns;
+        const columnTitle = destColumn ? (destColumn.title || destColumn.name) : '';
+
+        setSaveError('');
+        setIsSaving(true);
+        setTask(prev => ({ ...prev, columnId: payload.destColumnId, columnTitle }));
+        setColumns(prev => applyMoveToColumns(prev, taskId, payload.sourceColumnId, payload.destColumnId, payload.destinationIndex));
+        try {
+            const response = await moveTask(taskId, payload);
+            const moved = { ...mergeMovedTask(previousTask, response?.task, payload.destColumnId), columnTitle };
+            setTask(moved);
+            if (onTaskUpdated) onTaskUpdated(moved);
+            loadActivities();
+        } catch (error) {
+            console.error("Moving the task failed, reverting:", error);
+            setTask(previousTask);
+            setColumns(previousColumns);
+            setSaveError(`Couldn't move the task — ${error.message}`);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const handleInputChange = (field, value) => {
         const updatedFields = { [field]: value };
         if (field === 'points' || field === 'point') {
@@ -346,10 +380,8 @@ function TaskDrawer({
     const handleDeleteTask = async () => {
         if (!canDelete) return;
         // the dialog stays open (loading) until the request finishes and shows the API error if it fails
-        await confirm({
-            title: "Xóa công việc?",
-            message: "Bạn có chắc chắn muốn xóa công việc này?",
-            tone: "danger",
+        await confirm(deleteConfirm({
+            item: "task",
             onConfirm: async () => {
                 try {
                     await deleteTask(taskId);
@@ -361,7 +393,7 @@ function TaskDrawer({
                     throw error;
                 }
             },
-        });
+        }));
     };
 
     // Checklist / comment actions return promises: the shared sections show progress and errors
@@ -401,17 +433,23 @@ function TaskDrawer({
     const handleDeleteChecklist = async (item) => {
         if (!canManageChecklist) return;
 
-        const previousChecklist = task.checklist;
-        setTask(prev => ({ ...prev, checklist: (prev.checklist || []).filter(i => String(i._id) !== String(item._id)) }));
+        await confirm(deleteConfirm({
+            item: "checklist",
+            name: item.text,
+            onConfirm: async () => {
+                const previousChecklist = task.checklist;
+                setTask(prev => ({ ...prev, checklist: (prev.checklist || []).filter(i => String(i._id) !== String(item._id)) }));
 
-        try {
-            // see the BACKEND MISMATCH note on deleteChecklist in api.jsx — the item id is passed on purpose
-            await deleteChecklist(item._id);
-        } catch (error) {
-            console.error("Lỗi khi xóa checklist:", error);
-            setTask(prev => ({ ...prev, checklist: previousChecklist }));
-            throw error;
-        }
+                try {
+                    // see the BACKEND MISMATCH note on deleteChecklist in api.jsx — the item id is passed on purpose
+                    await deleteChecklist(item._id);
+                } catch (error) {
+                    console.error("Deleting the checklist item failed:", error);
+                    setTask(prev => ({ ...prev, checklist: previousChecklist }));
+                    throw error;
+                }
+            },
+        }));
     };
 
     const handleAddComment = async (text) => {
@@ -489,9 +527,9 @@ function TaskDrawer({
                                 <span className="drawer-field-label">Column</span>
                                 <select
                                     className="select"
-                                    disabled={!canEditStatus}
+                                    disabled={!canEditStatus || isSaving}
                                     value={extractColumnId(task.columnId)}
-                                    onChange={(e) => handleUpdateTaskField({ columnId: e.target.value })}
+                                    onChange={(e) => handleColumnChange(e.target.value)}
                                 >
                                     {columns.length > 0 ? (
                                         columns.map((col) => (
@@ -605,7 +643,7 @@ function TaskDrawer({
 const formatShortDate = (value) => {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
 // --- MAIN MY TASKS COMPONENT ---
@@ -627,11 +665,7 @@ function MyTasks() {
 
         const expiringCount = currentTasks.filter((task) => {
             // 1. Kiểm tra trạng thái xem có thuộc Done / Completed không
-            const statusName = (typeof task.columnId === 'object'
-                ? (task.columnId?.name || task.columnId?.title || "")
-                : "").toLowerCase();
-            const isDone = statusName.includes('done') || statusName.includes('completed');
-            if (isDone) return false;
+            if (isTaskCompleted(task)) return false;
 
             // 2. Xác định ngày hết hạn (dueDate hoặc tính theo tuần dự án)
             const projId = typeof task.projectId === 'object' ? (task.projectId?._id || task.projectId?.id) : task.projectId;
@@ -717,11 +751,25 @@ function MyTasks() {
         loadMyTasks();
     }, []);
 
+    // The drawer works with plain ids; the list keeps the populated objects from GET /task/my-task
+    // (column title, project name/color, assignee names) and only replaces them when they really changed.
     const handleTaskUpdatedFromDrawer = (updatedTask) => {
         setTasks((prevTasks) =>
-            prevTasks.map((t) =>
-                String(t._id) === String(updatedTask._id) ? { ...t, ...updatedTask } : t
-            )
+            prevTasks.map((t) => {
+                if (String(t._id) !== String(updatedTask._id)) return t;
+                const next = { ...t, ...updatedTask };
+                const newColumnId = extractColumnId(updatedTask.columnId);
+                if (typeof t.columnId === 'object' && t.columnId && extractColumnId(t.columnId) === newColumnId) {
+                    next.columnId = t.columnId;
+                } else if (newColumnId) {
+                    next.columnId = { _id: newColumnId, title: updatedTask.columnTitle || '' };
+                }
+                if (typeof t.projectId === 'object' && t.projectId) next.projectId = t.projectId;
+                const ids = (updatedTask.assignees || []).map(a => String(typeof a === 'object' ? (a._id || a.id) : a));
+                const known = (t.assignees || []).filter(a => typeof a === 'object' && ids.includes(String(a._id || a.id)));
+                if (known.length === ids.length) next.assignees = known;
+                return next;
+            })
         );
     };
 
@@ -738,10 +786,8 @@ function MyTasks() {
 
             if (activeTab === "all") return true;
 
-            const statusName = (typeof task.columnId === 'object'
-                ? (task.columnId?.name || task.columnId?.title || "")
-                : "").toLowerCase();
-            const isDone = statusName.includes('done') || statusName.includes('completed');
+            // completion is the backend's task.status (set by PUT /task/:id/move), not the column name
+            const isDone = isTaskCompleted(task);
 
             // Tab Completed: Lọc các task có status dạng Done/Completed
             if (activeTab === "completed") {
@@ -850,9 +896,9 @@ function MyTasks() {
                             {filteredTasks.map((task) => {
                                 const totalChecklist = task.checklist?.length || 0;
                                 const completedChecklist = task.checklist?.filter(i => i.completed)?.length || 0;
-                                const statusName = typeof task.columnId === 'object'
-                                    ? (task.columnId?.name || task.columnId?.title || "No status")
-                                    : "Review";
+                                const statusName = typeof task.columnId === 'object' && task.columnId
+                                    ? (task.columnId?.name || task.columnId?.title || "No column")
+                                    : (task.columnTitle || (task.columnId ? "No column" : "Backlog"));
 
                                 const projId = typeof task.projectId === 'object' ? (task.projectId?._id || task.projectId?.id) : task.projectId;
                                 const projStartDate = (typeof task.projectId === 'object' && task.projectId?.startDate)

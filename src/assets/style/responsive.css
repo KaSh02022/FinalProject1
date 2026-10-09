@@ -112,10 +112,10 @@
   .header-search { display: none; }
 
   .grid-4, .grid-3, .grid-2, .grid-stats, .grid-cards { grid-template-columns: 1fr; }
-  .burndown-card { padding: var(--space-4); }
-  .burndown-project { width: 100%; }
-  .burndown-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .burndown-chart { height: 280px; }
+  .chart-card { padding: var(--space-4); }
+  .analytics-project { width: 100%; }
+  .chart-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chart-canvas { height: 270px; }
 
   .page-content { padding: var(--space-4); }
   .page-content-inner { padding: var(--space-4); }
@@ -168,6 +168,9 @@
   .board-week { flex: 1 1 0; min-width: 0; }
   .board-week .select { width: 100%; min-width: 0; }
   .board-add-btn { margin-left: 0; }
+  /* board summary: its own row under the controls */
+  .board-summary { order: 10; flex: 1 1 100%; margin-left: 0; }
+  .board-summary + .board-add-btn { margin-left: 0; }
   .project-title { font-size: var(--text-md); }
   .project-tabs { gap: var(--space-4); margin-top: var(--space-2); }
 

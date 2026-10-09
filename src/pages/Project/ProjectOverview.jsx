@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import ErrorState from '../../components/common/ErrorState.jsx';
-import { useConfirm } from '../../components/common/confirmContext.js';
+import { useConfirm, deleteConfirm } from '../../components/common/confirmContext.js';
 import { notify } from '../../utils/notify.js';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 import {
@@ -30,7 +30,7 @@ import ProjectHeader from '../../components/project/ProjectHeader.jsx';
 const API_BASE_URL = API_ORIGIN;
 
 // Helper function format ngày dạng DD/MM/YYYY
-const formatDate = (dateString, fallback = 'Chưa đặt') => {
+const formatDate = (dateString, fallback = 'Not set') => {
     if (!dateString) return fallback;
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return fallback;
@@ -157,7 +157,7 @@ export default function ProjectOverview() {
 
         // Chặn người dùng nếu không phải Manager hoặc Admin
         if (!isManager) {
-            notify({ type: "error", title: "Bạn cần có quyền Manager hoặc Admin để thực hiện thao tác này!" });
+            notify({ type: "error", title: "Only a Manager or an Admin can do this." });
             return;
         }
 
@@ -192,11 +192,11 @@ export default function ProjectOverview() {
 
     // Delete project document
     const handleDeleteDocument = async (docId) => {
+        const doc = documents.find(d => String(d._id) === String(docId));
         // the dialog stays open until the request finishes; a failure is shown inside it (was an alert)
-        await confirm({
-            title: "Delete document?",
-            message: "Are you sure you want to delete this document?",
-            tone: "danger",
+        await confirm(deleteConfirm({
+            item: "document",
+            name: doc?.name,
             onConfirm: async () => {
                 try {
                     const res = await deleteProjectDocument(projectId, docId);
@@ -210,7 +210,7 @@ export default function ProjectOverview() {
                     throw new Error(error.message || "An error occurred while deleting the document.");
                 }
             },
-        });
+        }));
     };
 
     if (loading) {
@@ -373,9 +373,11 @@ export default function ProjectOverview() {
 
                                             {isOwnerOrManager && (
                                                 <button
+                                                    type="button"
                                                     onClick={() => handleDeleteDocument(doc._id)}
                                                     style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px' }}
-                                                    title="Delete File"
+                                                    title="Delete file"
+                                                    aria-label={`Delete document ${doc.name || ''}`.trim()}
                                                 >
                                                     <Trash2 size={18} />
                                                 </button>

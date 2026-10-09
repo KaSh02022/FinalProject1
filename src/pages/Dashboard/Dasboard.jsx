@@ -1,5 +1,5 @@
 import KPI from "./KPI/KPI";
-import EpicBurndown from "./EpicBurndown/EpicBurndown";
+import ProjectAnalytics from "./analytics/ProjectAnalytics";
 
 // Name of the signed-in user as stored by the login page ("" when unknown — never a made-up name)
 const getStoredUserName = () => {
@@ -25,7 +25,7 @@ function Dashboard() {
                 </div>
 
                 <KPI />
-                <EpicBurndown />
+                <ProjectAnalytics />
             </div>
         </main>
     );

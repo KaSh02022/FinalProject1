@@ -360,6 +360,15 @@ button.panel-row:hover { background-color: var(--color-surface-hover); }
   color: var(--color-primary-700);
 }
 .board-add-btn { margin-left: auto; flex-shrink: 0; }
+/* project context next to "Add task" */
+.board-summary {
+  display: flex; align-items: center; gap: var(--space-1) var(--space-4); flex-wrap: wrap;
+  margin-left: auto; list-style: none;
+  font-size: var(--text-xs); color: var(--color-text-muted); font-variant-numeric: tabular-nums;
+}
+.board-summary li { display: inline-flex; align-items: center; gap: var(--space-1); white-space: nowrap; }
+.board-summary .icon { color: var(--color-text-subtle); }
+.board-summary + .board-add-btn { margin-left: var(--space-2); }
 
 .board {
   flex: 1;
@@ -375,18 +384,29 @@ button.panel-row:hover { background-color: var(--color-surface-hover); }
   padding: 0 var(--board-gutter) var(--space-3);
   scroll-padding-inline: var(--board-gutter);
 }
+/* columns share the width on wide screens (4 default columns fit at 1280+) and keep a readable minimum;
+   the board scrolls sideways once they no longer fit */
 .board-column {
-  --board-column-width: 288px;
-  flex: 0 0 var(--board-column-width);
+  --board-column-width: 272px;
+  --column-accent: var(--color-border-strong);
+  flex: 1 0 var(--board-column-width);
   width: var(--board-column-width);
+  max-width: 360px;
   min-width: 0;
   max-height: 100%;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--color-border);
+  border-top: 3px solid var(--column-accent);
   border-radius: var(--radius-lg);
   background-color: var(--color-surface-sunken);
 }
+.board-column.kind-backlog { --column-accent: var(--status-backlog); }
+.board-column.kind-todo { --column-accent: var(--status-todo); }
+.board-column.kind-progress { --column-accent: var(--status-progress); }
+.board-column.kind-review { --column-accent: var(--status-review); }
+.board-column.kind-done { --column-accent: var(--status-done); }
+.board-column.kind-canceled { --column-accent: var(--status-canceled); }
 .board-column-header {
   flex-shrink: 0;
   display: flex;
@@ -413,10 +433,27 @@ button.panel-row:hover { background-color: var(--color-surface-hover); }
 }
 .board-column-count {
   flex-shrink: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
   color: var(--color-text-muted);
-  font-size: var(--text-xs);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.board-column-points {
+  flex-shrink: 0;
+  color: var(--color-text-subtle);
+  font-size: 11px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .board-column-add { margin-left: auto; flex-shrink: 0; }
 .board-column-body {
@@ -483,6 +520,22 @@ button.panel-row:hover { background-color: var(--color-surface-hover); }
 }
 .task-card:active:not(.is-dragging) { background-color: var(--color-bg); }
 .task-card.is-locked .priority-tag { opacity: 0.9; }
+/* finished (backend status "completed"): quieter card, green badge */
+.task-card.is-completed { background-color: var(--color-bg); }
+.task-card.is-completed .task-card-title { color: var(--color-text-muted); }
+.task-card-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 /* card content (pages/Project/board/TaskCard.jsx)
    priority → title → description → meta (week · points · checklist) → deadline signal + avatars + actions */
@@ -560,8 +613,9 @@ button.panel-row:hover { background-color: var(--color-surface-hover); }
 }
 .task-card-signal.is-overdue { color: var(--color-danger); background-color: var(--color-danger-bg); }
 .task-card-signal.is-expiring { color: var(--color-priority-medium-text); background-color: var(--color-warning-bg); }
+/* 22px circles: wide initials ("MN", "WW") fit inside the ring instead of being clipped */
 .task-card .avatar-group .avatar,
-.task-card .avatar-group .avatar-overflow { margin-left: -3px; border-width: 2px; letter-spacing: -0.02em; }
+.task-card .avatar-group .avatar-overflow { width: 22px; height: 22px; margin-left: -4px; border-width: 1.5px; font-size: 9px; letter-spacing: 0; }
 .task-card .avatar-group > :first-child { margin-left: 0; }
 
 /* "Not accept" (leader/manager, Done column) */
@@ -699,23 +753,78 @@ button.panel-row:hover { background-color: var(--color-surface-hover); }
 .page-content-inner.dashboard-page { padding: 0; }
 .dashboard-page { gap: var(--space-4); }
 .page-loading.kpi-loading { min-height: 0; padding: var(--space-4) 0; }
-/* Epic Burndown card (pages/Dashboard/EpicBurndown) — values come straight from the backend */
-.burndown-card { padding: var(--space-5); box-shadow: var(--shadow-xs); min-width: 0; }
-.burndown-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); }
-.burndown-heading { min-width: 0; }
-.burndown-title { font-size: 16px; font-weight: 600; }
-.burndown-subtitle { font-size: 12.5px; color: var(--color-text-muted); }
-.burndown-project { width: 260px; max-width: 100%; }
-.burndown-body { min-width: 0; }
-.burndown-loading { min-height: 300px; }
-.burndown-empty { min-height: 300px; }
-.burndown-card .error-state { margin: var(--space-4) auto; }
-.burndown-summary { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); margin-bottom: var(--space-3); }
-.burndown-summary-item dt { font-size: 12px; font-weight: 500; color: var(--color-text-muted); }
-.burndown-summary-item dd { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.burndown-chart { width: 100%; height: 320px; min-width: 0; transition: opacity .15s ease; }
-.burndown-chart.is-refreshing { opacity: .6; }
-.burndown-note { margin-top: var(--space-2); font-size: 12px; color: var(--color-text-muted); }
+/* Dashboard project analytics (pages/Dashboard/analytics) — one picker, two chart cards.
+   Values come straight from the backend; the CSS only lays them out. */
+.analytics { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.analytics-header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.section-title { font-size: 16px; font-weight: 600; }
+.section-subtitle { font-size: 12.5px; color: var(--color-text-muted); }
+.analytics-project { width: 280px; max-width: 100%; }
+.analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: var(--space-4); align-items: start; }
+.analytics-placeholder { min-height: 240px; display: flex; align-items: center; justify-content: center; }
+
+/* chart card (chartKit.jsx) — shared by every line chart */
+.chart-card { padding: var(--space-5); box-shadow: var(--shadow-xs); min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+.chart-card-header { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.chart-card-icon {
+  width: 32px; height: 32px; flex-shrink: 0; border-radius: var(--radius-md);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--color-primary-50); color: var(--color-primary-600);
+}
+.chart-card-icon .icon { width: 16px; height: 16px; }
+.chart-card-heading { min-width: 0; }
+.chart-card-title { font-size: 15px; font-weight: 600; line-height: 1.3; }
+.chart-card-subtitle { font-size: 12.5px; color: var(--color-text-muted); }
+.chart-card-body, .burndown-body, .expectancy-body { min-width: 0; }
+.chart-card .error-state { margin: var(--space-2) auto; }
+.chart-state, .burndown-loading, .burndown-empty, .expectancy-loading, .expectancy-empty { min-height: 300px; }
+
+.chart-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: var(--space-2); margin-bottom: var(--space-3); }
+.chart-stat { padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg); min-width: 0; }
+.chart-stat dt { font-size: 11.5px; font-weight: 500; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chart-stat dd { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.chart-legend { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin-bottom: var(--space-1); font-size: 12.5px; color: var(--color-text-muted); }
+.chart-legend-item { display: inline-flex; align-items: center; gap: var(--space-2); }
+.chart-swatch { width: 18px; height: 0; border-top: 2.5px solid var(--swatch); flex-shrink: 0; }
+.chart-swatch.is-dashed { border-top-style: dashed; border-top-width: 2px; }
+
+.chart-canvas { width: 100%; height: 300px; min-width: 0; transition: opacity .15s ease; }
+.chart-canvas.is-refreshing { opacity: .6; }
+.chart-note { margin-top: var(--space-2); font-size: 12px; color: var(--color-text-muted); }
+
+.chart-tooltip {
+  min-width: 168px; padding: var(--space-2) var(--space-3);
+  background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md); font-size: 12.5px;
+}
+.chart-tooltip-label { font-weight: 600; margin-bottom: var(--space-1); }
+.chart-tooltip-list { display: flex; flex-direction: column; gap: 2px; }
+.chart-tooltip-row { display: flex; align-items: center; gap: var(--space-2); }
+.chart-tooltip-name { flex: 1; color: var(--color-text-muted); }
+.chart-tooltip-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart-tooltip-value.is-empty { font-weight: 500; color: var(--color-text-subtle); font-style: italic; }
+
+/* Project → Chart page (pages/Project/ProjectChart.jsx) */
+.project-charts-page { display: flex; flex-direction: column; gap: var(--space-6); }
+.section-title { display: inline-flex; align-items: center; gap: var(--space-2); }
+.stagnation { display: flex; flex-direction: column; gap: var(--space-3); }
+.stagnation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: var(--space-4); }
+.stagnation-card { --column-accent: var(--color-border-strong); overflow: hidden; border-top: 3px solid var(--column-accent); box-shadow: var(--shadow-xs); min-width: 0; }
+.stagnation-card.kind-todo { --column-accent: var(--status-todo); }
+.stagnation-card.kind-progress { --column-accent: var(--status-progress); }
+.stagnation-card.kind-review { --column-accent: var(--status-review); }
+.stagnation-card-header { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); }
+.stagnation-card-title { font-size: var(--text-sm); font-weight: 600; }
+.stagnation-card-body { max-height: 320px; overflow-y: auto; }
+.stagnation-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.stagnation-table th { padding: var(--space-2) var(--space-4); text-align: left; font-size: 11.5px; font-weight: 600; color: var(--color-text-muted); background: var(--color-bg); }
+.stagnation-table td { padding: var(--space-2) var(--space-4); border-top: 1px solid var(--color-surface-hover); }
+.stagnation-table .is-numeric { width: 72px; text-align: right; font-variant-numeric: tabular-nums; }
+.stagnation-task { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stagnation-days { font-weight: 600; color: var(--color-text); }
+.stagnation-days.is-stale { color: var(--color-danger); }
+.stagnation-empty { padding: var(--space-5) var(--space-4) !important; text-align: center; color: var(--color-text-subtle); font-size: 12.5px; }
 .my-tasks-page { gap: var(--space-4); }
 .filter-bar.my-tasks-filter { margin-bottom: var(--space-3); }
 .filter-bar .input-icon-wrap.my-tasks-search { flex: 1; width: auto; min-width: 0; }

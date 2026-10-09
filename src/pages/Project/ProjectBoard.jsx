@@ -23,7 +23,7 @@ import {
 import { API_BASE_URL } from "../../config/apiConfig.js";
 import "./project.css";
 import ErrorState from '../../components/common/ErrorState.jsx';
-import { useConfirm } from '../../components/common/confirmContext.js';
+import { useConfirm, deleteConfirm } from '../../components/common/confirmContext.js';
 import Modal from '../../components/common/Modal.jsx';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 import {
@@ -33,17 +33,19 @@ import {
 } from "lucide-react";
 
 import ProjectHeader from '../../components/project/ProjectHeader.jsx';
+import { applyMoveToColumns, buildMovePayload, getDestinationIndex, mergeMovedTask, idOf } from '../../utils/taskMove.js';
 import BoardToolbar from './board/BoardToolbar.jsx';
 import BoardColumnHeader from './board/BoardColumnHeader.jsx';
 import TaskCard from './board/TaskCard.jsx';
+import { getColumnStatus } from './board/columnStatus.js';
 import TaskDrawerFrame from '../../components/task/TaskDrawerFrame.jsx';
 import { DrawerSection, ChecklistSection, CommentsSection, ActivitySection, AssigneePicker, UserAvatar } from '../../components/task/TaskDrawerSections.jsx';
 
 // Helper function định dạng ngày theo chuẩn DD/MM/YYYY
 const formatDateDMY = (dateValue) => {
-    if (!dateValue) return 'Chưa đặt';
+    if (!dateValue) return 'Not set';
     const d = new Date(dateValue);
-    if (isNaN(d.getTime())) return 'Chưa đặt';
+    if (isNaN(d.getTime())) return 'Not set';
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
@@ -186,6 +188,7 @@ function TaskDrawer({
                         maxWeeks = 1,
                         onTaskUpdated,
                         onTaskDeleted,
+                        onMoveTask,
                         isManager = false,
                         isLeader = false,
                         syncEvent = null
@@ -330,6 +333,25 @@ function TaskDrawer({
         }
     };
 
+    // Changing the column is a move (PUT /task/:id/move), not a field update: only the move endpoint sets
+    // status / completedAt / completedDate and the column order. The board performs it (it owns the order).
+    const handleColumnChange = async (destColumnId) => {
+        if (!task || isSaving || !onMoveTask) return;
+        const sourceColumnId = extractColumnId(task.columnId);
+        if (!destColumnId || destColumnId === sourceColumnId) return;
+        setSaveError('');
+        setIsSaving(true);
+        try {
+            const moved = await onMoveTask(taskId, sourceColumnId, destColumnId);
+            setTask(prev => prev ? normalizeTask({ ...prev, ...moved, assignees: prev.assignees }) : prev);
+            loadActivities();
+        } catch (error) {
+            setSaveError(`Couldn't move the task — ${error.message}`);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const handleInputChange = (field, value) => {
         const updatedFields = { [field]: value };
         if (field === 'points' || field === 'point') {
@@ -373,10 +395,8 @@ function TaskDrawer({
     const handleDeleteTask = async () => {
         if (!canDeleteTask) return;
         // the dialog stays open (loading) until the request finishes and shows the API error if it fails
-        await confirm({
-            title: "Xóa task?",
-            message: "Bạn có chắc chắn muốn xóa task này?",
-            tone: "danger",
+        await confirm(deleteConfirm({
+            item: "task",
             onConfirm: async () => {
                 try {
                     await deleteTask(taskId);
@@ -388,7 +408,7 @@ function TaskDrawer({
                     throw error;
                 }
             },
-        });
+        }));
     };
 
     // Checklist / comment actions return promises: the shared sections show progress and errors
@@ -425,10 +445,9 @@ function TaskDrawer({
     const handleDeleteChecklist = async (item) => {
         if (!canDeleteChecklist) return;
 
-        await confirm({
-            title: "Xóa checklist?",
-            message: "Bạn có chắc chắn muốn xóa checklist này?",
-            tone: "danger",
+        await confirm(deleteConfirm({
+            item: "checklist",
+            name: item.text,
             // same optimistic remove + rollback as before; the dialog shows the API error and stays open
             onConfirm: async () => {
                 const previousChecklist = task.checklist;
@@ -438,12 +457,12 @@ function TaskDrawer({
                     // see the BACKEND MISMATCH note on deleteChecklist in api.jsx — the item id is passed on purpose
                     await deleteChecklist(item._id);
                 } catch (error) {
-                    console.error("Lỗi khi xóa checklist:", error);
+                    console.error("Deleting the checklist item failed:", error);
                     setTask(prev => ({ ...prev, checklist: previousChecklist }));
                     throw error;
                 }
             },
-        });
+        }));
     };
 
     const handleAddComment = async (text) => {
@@ -521,8 +540,8 @@ function TaskDrawer({
                                 <select
                                     className="select"
                                     value={extractColumnId(task.columnId)}
-                                    disabled={!canEditAll}
-                                    onChange={(e) => handleUpdateTaskField({ columnId: e.target.value })}
+                                    disabled={!canEditAll || isSaving}
+                                    onChange={(e) => handleColumnChange(e.target.value)}
                                 >
                                     {columns.map((col) => (
                                         <option key={col._id} value={String(col._id)}>{col.name || col.title}</option>
@@ -667,6 +686,8 @@ export default function ProjectBoard({ projectId: propProjectId }) {
     const [newTaskWeek, setNewTaskWeek] = useState(1);
     const [newTaskDesc, setNewTaskDesc] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // last failed drag / move (the board was already rolled back)
+    const [moveError, setMoveError] = useState('');
 
     const getCurrentUser = () => {
         try {
@@ -783,6 +804,10 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                 };
                 return [...prevTasks, formattedTask];
             });
+            // POST /task appends the task to its column order
+            if (taskData.columnId) {
+                setColumns(prev => applyMoveToColumns(prev, taskId, null, taskData.columnId, Number.MAX_SAFE_INTEGER, true));
+            }
         };
 
         // Sự kiện 2: Khi có Task được cập nhật
@@ -810,6 +835,9 @@ export default function ProjectBoard({ projectId: propProjectId }) {
         };
 
         // Sự kiện 3: Khi Kéo Thả / Di chuyển Task
+        // payload { taskId, sourceColumnId, destColumnId, destinationIndex, task } — `task` is not populated,
+        // so only the move fields are taken from it (status / completedAt / completedDate); the same order
+        // change as the backend is applied (idempotent for this tab's own move)
         const handleTaskMoved = (data) => {
             if (!data) return;
             const taskId = String(data.taskId || data._id || data.id);
@@ -818,17 +846,12 @@ export default function ProjectBoard({ projectId: propProjectId }) {
             if (!taskId || !targetColumnId) return;
 
             setTasks(prevTasks =>
-                prevTasks.map(t => {
-                    if (String(t._id || t.id) === taskId) {
-                        return {
-                            ...t,
-                            columnId: targetColumnId
-                        };
-                    }
-                    return t;
-                })
+                prevTasks.map(t => String(t._id || t.id) === taskId ? mergeMovedTask(t, data.task, targetColumnId) : t)
             );
-            if (String(selectedTaskIdRef.current) === taskId) setDrawerSync({ type: 'task', data: { _id: taskId, columnId: targetColumnId }, at: Date.now() });
+            setColumns(prev => applyMoveToColumns(prev, taskId, data.sourceColumnId, targetColumnId, data.destinationIndex));
+            if (String(selectedTaskIdRef.current) === taskId) {
+                setDrawerSync({ type: 'task', data: mergeMovedTask({ _id: taskId }, data.task, targetColumnId), at: Date.now() });
+            }
         };
 
         // Sự kiện 5: Comment mới (chỉ drawer của task đang mở cần)
@@ -958,6 +981,33 @@ export default function ProjectBoard({ projectId: propProjectId }) {
         setTasks(prevTasks => prevTasks.filter(t => String(t._id || t.id) !== String(deletedTaskId)));
     };
 
+    /**
+     * Move a task to another column / position: optimistic (column + order), PUT /task/:id/move, then the
+     * backend's status / completedAt / completedDate from response.task; everything rolls back if it fails.
+     * Resolves with the merged task, rejects with the API error.
+     */
+    const performMove = async (taskId, sourceColumnId, destColumnId, destinationIndex) => {
+        const id = String(taskId);
+        const payload = buildMovePayload(sourceColumnId, destColumnId, destinationIndex);
+        const previousTasks = tasks;
+        const previousColumns = columns;
+
+        setTasks(prev => prev.map(t => String(t._id || t.id) === id ? { ...t, columnId: payload.destColumnId } : t));
+        setColumns(prev => applyMoveToColumns(prev, id, payload.sourceColumnId, payload.destColumnId, payload.destinationIndex));
+
+        try {
+            const response = await moveTask(id, payload);
+            const current = previousTasks.find(t => String(t._id || t.id) === id) || { _id: id };
+            setTasks(prev => prev.map(t => String(t._id || t.id) === id ? mergeMovedTask(t, response?.task, payload.destColumnId) : t));
+            return mergeMovedTask(current, response?.task, payload.destColumnId);
+        } catch (error) {
+            console.error("Moving the task failed, reverting:", error);
+            setTasks(previousTasks);
+            setColumns(previousColumns);
+            throw error;
+        }
+    };
+
     const handleOnDragEnd = async (result) => {
         const { destination, source, draggableId } = result;
         if (!destination) return;
@@ -968,69 +1018,47 @@ export default function ProjectBoard({ projectId: propProjectId }) {
             return;
         }
 
-        const targetColumn = columns.find(c => String(c._id) === String(destination.droppableId));
-        const targetColumnName = (targetColumn?.name || targetColumn?.title || '').toLowerCase();
-        const isMovingToDone = targetColumnName.includes('done');
+        // destination.index counts the cards shown (search / week filters may hide some): place the task
+        // right before the card it was dropped above, in the column's full order
+        const destColumn = columns.find(c => String(c._id) === String(destination.droppableId));
+        const shown = getSortedTasksForColumn(destColumn || {}).filter(t => String(t._id || t.id) !== String(draggableId));
+        const before = shown[destination.index];
+        let destinationIndex = getDestinationIndex(destColumn, draggableId, before ? (before._id || before.id) : undefined);
+        if (!before && shown.length > 0) {
+            const order = (destColumn?.taskOrderIds || []).map(idOf).filter(x => x !== String(draggableId));
+            const lastShown = order.indexOf(String(shown[shown.length - 1]._id || shown[shown.length - 1].id));
+            if (lastShown !== -1) destinationIndex = lastShown + 1;
+        }
 
-        const previousTasks = [...tasks];
-
-        setTasks((prevTasks) => {
-            const newTasks = Array.from(prevTasks);
-            const movedTaskIndex = newTasks.findIndex(t => String(t._id || t.id) === String(draggableId));
-
-            if (movedTaskIndex !== -1) {
-                newTasks[movedTaskIndex] = {
-                    ...newTasks[movedTaskIndex],
-                    columnId: destination.droppableId
-                };
-            }
-            return newTasks;
-        });
-
-        const payload = {
-            sourceColumnId: source.droppableId === 'backlog' ? null : source.droppableId,
-            destColumnId: destination.droppableId,
-            destinationIndex: destination.index,
-            action: isMovingToDone ? 'accept' : undefined
-        };
-
+        setMoveError('');
         try {
-            await moveTask(draggableId, payload);
+            await performMove(draggableId, source.droppableId === 'backlog' ? null : source.droppableId, destination.droppableId, destinationIndex);
         } catch (error) {
-            console.error("Lỗi kéo thả task, hoàn tác UI:", error);
-            setTasks(previousTasks);
+            setMoveError(`Couldn't move the task — ${error.message}`);
         }
     };
 
-    const handleLeaderDecisionOnTask = async (e, task, currentColumnId, isAccepted) => {
+    // Drawer "Column" field: append to the end of the destination column
+    const handleMoveFromDrawer = (taskId, sourceColumnId, destColumnId) => {
+        const destColumn = columns.find(c => String(c._id) === String(destColumnId));
+        return performMove(taskId, sourceColumnId, destColumnId, getDestinationIndex(destColumn, taskId));
+    };
+
+    // "Not accept" on a Done card sends it back to the top of Review (the move endpoint resets completion)
+    const handleLeaderDecisionOnTask = async (e, task, currentColumnId) => {
         e.stopPropagation();
 
         const targetColumn = columns.find(c => {
             const name = (c.name || c.title || '').toLowerCase();
-            return isAccepted ? name.includes('done') : (name.includes('review') || name.includes('in review'));
+            return name.includes('review') || name.includes('in review');
         }) || columns[0];
+        if (!targetColumn || String(targetColumn._id) === String(currentColumnId)) return;
 
-        const destColumnId = targetColumn ? targetColumn._id : currentColumnId;
-        const previousTasks = [...tasks];
-
-        setTasks((prevTasks) =>
-            prevTasks.map(t =>
-                String(t._id || t.id) === String(task._id || task.id)
-                    ? { ...t, columnId: extractColumnId(destColumnId) }
-                    : t
-            )
-        );
-
+        setMoveError('');
         try {
-            await moveTask(task._id || task.id, {
-                sourceColumnId: currentColumnId,
-                destColumnId: destColumnId,
-                destinationIndex: 0,
-                action: isAccepted ? 'accept' : 'not_accept'
-            });
+            await performMove(task._id || task.id, currentColumnId, targetColumn._id, 0);
         } catch (error) {
-            console.error("Lỗi cập nhật trạng thái duyệt task:", error);
-            setTasks(previousTasks);
+            setMoveError(`Couldn't move the task — ${error.message}`);
         }
     };
 
@@ -1088,6 +1116,8 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                 if (exists) return prevTasks;
                 return [...prevTasks, formattedNewTask];
             });
+            // POST /task appends the new task to its column order
+            setColumns(prev => applyMoveToColumns(prev, formattedNewTask._id, null, formattedNewTask.columnId, Number.MAX_SAFE_INTEGER, true));
 
             closeModal();
         } catch (error) {
@@ -1121,6 +1151,13 @@ export default function ProjectBoard({ projectId: propProjectId }) {
         );
     }
 
+    // project context for the toolbar (counts of the loaded tasks; completion = backend task.status)
+    const boardSummary = {
+        tasks: tasks.length,
+        points: tasks.reduce((sum, t) => sum + (Number(t.points ?? t.point) || 0), 0),
+        completed: tasks.filter(t => t.status === 'completed').length,
+    };
+
     const formattedStartDate = formatDateDMY(project?.startDate || project?.createdDate || project?.createdAt);
     const formattedDueDate = formatDateDMY(project?.date || project?.dueDate || project?.endDate);
 
@@ -1145,7 +1182,16 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                             onRetry={fetchBoardData}
                         />
                     )}
+                    {moveError && (
+                        <ErrorState
+                            variant="inline"
+                            title={moveError}
+                            message="The board was restored to its previous state."
+                            onRetry={fetchBoardData}
+                        />
+                    )}
                     <BoardToolbar
+                        summary={boardSummary}
                         searchQuery={searchQuery}
                         onSearchChange={setSearchQuery}
                         selectedWeek={selectedWeek}
@@ -1160,12 +1206,14 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                             {columns.map((column) => {
                                 const columnTasks = getSortedTasksForColumn(column);
                                 const isDoneColumn = (column.name || column.title || '').toLowerCase().includes('done');
+                                const columnPoints = columnTasks.reduce((sum, t) => sum + (Number(t.points ?? t.point) || 0), 0);
 
                                 return (
-                                    <div className="board-column" key={column._id}>
+                                    <div className={`board-column kind-${getColumnStatus(column.name || column.title).kind}`} key={column._id}>
                                         <BoardColumnHeader
                                             title={column.name || column.title}
                                             count={columnTasks.length}
+                                            points={columnPoints}
                                             canCreateTask={canCreateTask}
                                             onAddTask={() => handleOpenCreateModal(column._id, true)}
                                         />
@@ -1223,7 +1271,7 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                                                                             deadlineStatus={status}
                                                                             assignees={assigneeList}
                                                                             onOpen={() => handleOpenTaskDrawer(task._id || task.id)}
-                                                                            onNotAccept={showNotAcceptBtn ? (e) => handleLeaderDecisionOnTask(e, task, column._id, false) : undefined}
+                                                                            onNotAccept={showNotAcceptBtn ? (e) => handleLeaderDecisionOnTask(e, task, column._id) : undefined}
                                                                         />
                                                                     )}
                                                                 </Draggable>
@@ -1261,6 +1309,7 @@ export default function ProjectBoard({ projectId: propProjectId }) {
                 maxWeeks={totalProjectWeeks}
                 onTaskUpdated={handleTaskUpdatedFromDrawer}
                 onTaskDeleted={handleTaskDeletedFromDrawer}
+                onMoveTask={handleMoveFromDrawer}
                 isManager={isManager}
                 isLeader={isLeader}
                 syncEvent={drawerSync}

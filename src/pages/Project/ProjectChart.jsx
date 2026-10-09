@@ -4,8 +4,10 @@ import { useParams } from 'react-router-dom';
 import { fetchProjectById, fetchTasksByProject, fetchMembersByProject, fetchColumnsByProject } from '../../../api.jsx';
 import ErrorState from '../../components/common/ErrorState.jsx';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ResponsiveContainer } from 'recharts';
-import { Loader2, AlertCircle } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer } from 'recharts';
+import { AlertCircle, BarChart3, CalendarRange, Hourglass } from "lucide-react";
+import { ChartCard, LoadingBlock } from '../Dashboard/analytics/chartKit.jsx';
+import { CHART_COLORS, AXIS_TICK } from '../Dashboard/analytics/chartTheme.js';
 import "./project.css";
 
 import ProjectHeader from '../../components/project/ProjectHeader.jsx';
@@ -155,12 +157,13 @@ export default function ProjectChartPage() {
                     }
                 });
 
+                // same colours as the board column accents (--status-* tokens), so a status reads the same everywhere
                 const formattedStatusData = [
-                    { name: 'Backlog', tasks: counts.backlog, color: '#ef4444' },     // Red
-                    { name: 'To Do', tasks: counts.todo, color: '#3b82f6' },         // Blue
-                    { name: 'In Progress', tasks: counts.inProgress, color: '#22c55e' }, // Green
-                    { name: 'Review', tasks: counts.review, color: '#06b6d4' },       // Cyan
-                    { name: 'Done', tasks: counts.done, color: '#a855f7' }            // Purple
+                    { name: 'Backlog', tasks: counts.backlog, color: '#94a3b8' },
+                    { name: 'To Do', tasks: counts.todo, color: '#64748b' },
+                    { name: 'In Progress', tasks: counts.inProgress, color: '#f59e0b' },
+                    { name: 'Review', tasks: counts.review, color: '#6366f1' },
+                    { name: 'Done', tasks: counts.done, color: '#16a34a' }
                 ];
 
                 setStatusChartData(formattedStatusData);
@@ -202,74 +205,40 @@ export default function ProjectChartPage() {
         loadChartData();
     }, [activeProjectId, reloadKey]);
 
-    // Helper render từng bảng trạng thái
-    const renderStagnantTable = (title, dataList, headerBgColor) => (
-        <div style={{
-            flex: '1 1 300px',
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column'
-        }}>
-            {/* Table Header Title */}
-            <div style={{
-                backgroundColor: headerBgColor,
-                color: '#ffffff',
-                padding: '12px 16px',
-                textAlign: 'center',
-                fontWeight: '600',
-                fontSize: '16px'
-            }}>
-                {title}
-            </div>
-
-            {/* Table Content */}
-            <div style={{ overflowX: 'auto', flex: 1 }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', textAlign: 'left' }}>
+    // One "time in status" table per column (days since the task was last updated)
+    const renderStagnantTable = (title, dataList, kind) => (
+        <section className={`card stagnation-card kind-${kind}`} aria-label={`${title}: days in status`}>
+            <header className="stagnation-card-header">
+                <h3 className="stagnation-card-title">{title}</h3>
+                <span className="board-column-count">{dataList.length}</span>
+            </header>
+            <div className="stagnation-card-body">
+                <table className="stagnation-table">
                     <thead>
-                    <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                        <th style={{ padding: '10px 14px', color: '#4b5563', fontWeight: '600' }}>Tasks</th>
-                        <th style={{ padding: '10px 14px', color: '#4b5563', fontWeight: '600', width: '80px', textAlign: 'center' }}>Days</th>
-                    </tr>
+                        <tr>
+                            <th scope="col">Task</th>
+                            <th scope="col" className="is-numeric">Days</th>
+                        </tr>
                     </thead>
                     <tbody>
-                    {dataList.length === 0 ? (
-                        <tr>
-                            <td colSpan={2} style={{ padding: '20px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
-                                No tasks
-                            </td>
-                        </tr>
-                    ) : (
-                        dataList.map((item, idx) => (
-                            <tr key={item.id || idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                                <td style={{
-                                    padding: '10px 14px',
-                                    color: '#1f2937',
-                                    maxWidth: '200px',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis'
-                                }} title={item.title}>
-                                    {item.title}
-                                </td>
-                                <td style={{
-                                    padding: '10px 14px',
-                                    textAlign: 'center',
-                                    fontWeight: '600',
-                                    color: item.days > 7 ? '#ef4444' : '#374151'
-                                }}>
-                                    {item.days} d
-                                </td>
+                        {dataList.length === 0 ? (
+                            <tr>
+                                <td colSpan={2} className="stagnation-empty">No tasks in this status</td>
                             </tr>
-                        ))
-                    )}
+                        ) : (
+                            dataList.map((item, idx) => (
+                                <tr key={item.id || idx}>
+                                    <td className="stagnation-task" title={item.title}>{item.title}</td>
+                                    <td className={`is-numeric stagnation-days${item.days > 7 ? ' is-stale' : ''}`}>
+                                        {item.days} d
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
             </div>
-        </div>
+        </section>
     );
 
     // Charts built from failed requests would show fake zeros — show the error instead
@@ -288,9 +257,10 @@ export default function ProjectChartPage() {
         );
     }
 
+    const totalTasks = statusChartData.reduce((sum, d) => sum + d.tasks, 0);
+
     return (
         <>
-
                 <ProjectHeader
                     projectId={activeProjectId}
                     project={project}
@@ -301,8 +271,7 @@ export default function ProjectChartPage() {
                     loading={loadingPage}
                 />
 
-                {/* Main Content Area */}
-                <main className="page-content" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                <main className="page-content project-charts-page">
                     {membersFailed && (
                         <ErrorState
                             variant="inline"
@@ -312,86 +281,31 @@ export default function ProjectChartPage() {
                         />
                     )}
                     {loadingChart ? (
-                        <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            height: '350px',
-                            gap: '12px',
-                            color: '#4f46e5',
-                            backgroundColor: '#ffffff',
-                            borderRadius: '12px',
-                            padding: '24px'
-                        }}>
-                            <Loader2 className="animate-spin" size={36} />
-                            <span style={{ fontWeight: 500, color: '#4b5563', fontSize: '15px' }}>
-                                Loading...
-                            </span>
+                        <div className="card analytics-placeholder">
+                            <LoadingBlock text="Loading charts…" />
                         </div>
                     ) : errorMsg ? (
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            color: '#ef4444',
-                            height: '200px',
-                            backgroundColor: '#fef2f2',
-                            borderRadius: '8px'
-                        }}>
-                            <AlertCircle size={20} />
-                            <span>{errorMsg}</span>
+                        <div className="error-inline" role="alert">
+                            <AlertCircle className="icon icon-sm" aria-hidden="true" />
+                            <span className="error-inline-text">{errorMsg}</span>
                         </div>
                     ) : (
                         <>
-                            {/* SECTION 1: 2 Biểu đồ cột nằm trên 1 hàng */}
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))',
-                                gap: '24px',
-                                width: '100%'
-                            }}>
-                                {/* CHART 1: Task Count by Status */}
-                                <div style={{
-                                    backgroundColor: '#ffffff',
-                                    padding: '24px',
-                                    borderRadius: '12px',
-                                    border: '1px solid #e5e7eb',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                                    display: 'flex',
-                                    flexDirection: 'column'
-                                }}>
-                                    <h2 style={{
-                                        textAlign: 'center',
-                                        marginBottom: '20px',
-                                        fontSize: '17px',
-                                        fontWeight: '600',
-                                        color: '#1f2937'
-                                    }}>
-                                        Task Count by Status
-                                    </h2>
-
-                                    <div style={{ width: '100%', height: 320 }}>
+                            <div className="analytics-grid">
+                                <ChartCard
+                                    id="status-chart"
+                                    title="Tasks by Status"
+                                    subtitle={`${totalTasks} ${totalTasks === 1 ? 'task' : 'tasks'} by board column`}
+                                    icon={<BarChart3 className="icon" />}
+                                >
+                                    <div className="chart-canvas" aria-hidden="true">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={statusChartData} margin={{ top: 20, right: 20, left: -10, bottom: 20 }}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                                <XAxis
-                                                    dataKey="name"
-                                                    label={{ value: 'Status', position: 'insideBottom', offset: -10, style: { fontWeight: 600, fill: '#4b5563', fontSize: '13px' } }}
-                                                    tick={{ fontSize: 12 }}
-                                                />
-                                                <YAxis
-                                                    allowDecimals={false}
-                                                    label={{ value: 'Tasks', angle: -90, position: 'insideLeft', style: { fontWeight: 600, fill: '#4b5563', fontSize: '13px' } }}
-                                                    tick={{ fontSize: 12 }}
-                                                />
-                                                <Tooltip
-                                                    formatter={(value) => [`${value} tasks`, 'Task Count']}
-                                                    contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                                                />
-                                                <Legend verticalAlign="top" height={36} />
-                                                <Bar dataKey="tasks" name="Task Count" barSize={36} radius={[6, 6, 0, 0]}>
+                                            <BarChart data={statusChartData} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_COLORS.grid} />
+                                                <XAxis dataKey="name" interval={0} tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: CHART_COLORS.grid }} />
+                                                <YAxis allowDecimals={false} width={36} tick={AXIS_TICK} tickLine={false} axisLine={false} />
+                                                <Tooltip content={<CountTooltip unit="task" />} cursor={{ fill: 'rgba(148, 163, 184, 0.12)' }} />
+                                                <Bar dataKey="tasks" name="Tasks" maxBarSize={44} radius={[6, 6, 0, 0]} isAnimationActive={false}>
                                                     {statusChartData.map((entry, index) => (
                                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                                     ))}
@@ -399,80 +313,69 @@ export default function ProjectChartPage() {
                                             </BarChart>
                                         </ResponsiveContainer>
                                     </div>
-                                </div>
+                                    <table className="sr-only">
+                                        <caption>Tasks by status</caption>
+                                        <tbody>{statusChartData.map((d) => <tr key={d.name}><th scope="row">{d.name}</th><td>{d.tasks}</td></tr>)}</tbody>
+                                    </table>
+                                </ChartCard>
 
-                                {/* CHART 2: Task Count by Week */}
-                                <div style={{
-                                    backgroundColor: '#ffffff',
-                                    padding: '24px',
-                                    borderRadius: '12px',
-                                    border: '1px solid #e5e7eb',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                                    display: 'flex',
-                                    flexDirection: 'column'
-                                }}>
-                                    <h2 style={{
-                                        textAlign: 'center',
-                                        marginBottom: '20px',
-                                        fontSize: '17px',
-                                        fontWeight: '600',
-                                        color: '#1f2937'
-                                    }}>
-                                        Task Count by Week
-                                    </h2>
-
-                                    <div style={{ width: '100%', height: 320 }}>
+                                <ChartCard
+                                    id="week-chart"
+                                    title="Tasks by Week"
+                                    subtitle="Number of tasks planned for each week"
+                                    icon={<CalendarRange className="icon" />}
+                                >
+                                    <div className="chart-canvas" aria-hidden="true">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={weekChartData} margin={{ top: 20, right: 20, left: -10, bottom: 20 }}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                                <XAxis
-                                                    dataKey="weekLabel"
-                                                    label={{ value: 'Week', position: 'insideBottom', offset: -10, style: { fontWeight: 600, fill: '#4b5563', fontSize: '13px' } }}
-                                                    tick={{ fontSize: 12 }}
-                                                />
-                                                <YAxis
-                                                    allowDecimals={false}
-                                                    label={{ value: 'Tasks', angle: -90, position: 'insideLeft', style: { fontWeight: 600, fill: '#4b5563', fontSize: '13px' } }}
-                                                    tick={{ fontSize: 12 }}
-                                                />
-                                                <Tooltip
-                                                    formatter={(value) => [`${value} tasks`, 'Task Count']}
-                                                    contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                                                />
-                                                <Legend verticalAlign="top" height={36} />
-                                                <Bar dataKey="tasks" name="Task Count" fill="#4f46e5" barSize={36} radius={[6, 6, 0, 0]} />
+                                            <BarChart data={weekChartData} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_COLORS.grid} />
+                                                <XAxis dataKey="weekLabel" interval={0} tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: CHART_COLORS.grid }} />
+                                                <YAxis allowDecimals={false} width={36} tick={AXIS_TICK} tickLine={false} axisLine={false} />
+                                                <Tooltip content={<CountTooltip unit="task" />} cursor={{ fill: 'rgba(148, 163, 184, 0.12)' }} />
+                                                <Bar dataKey="tasks" name="Tasks" fill={CHART_COLORS.actual} maxBarSize={44} radius={[6, 6, 0, 0]} isAnimationActive={false} />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     </div>
-                                </div>
+                                    <table className="sr-only">
+                                        <caption>Tasks by week</caption>
+                                        <tbody>{weekChartData.map((d) => <tr key={d.weekLabel}><th scope="row">{d.weekLabel}</th><td>{d.tasks}</td></tr>)}</tbody>
+                                    </table>
+                                </ChartCard>
                             </div>
 
-                            {/* SECTION 2: 3 Bảng trì trệ nằm trên 1 hàng */}
-                            <div>
-                                <h2 style={{
-                                    textAlign: 'center',
-                                    marginBottom: '20px',
-                                    fontSize: '18px',
-                                    fontWeight: '600',
-                                    color: '#1f2937'
-                                }}>
-                                    Task Stagnation Days in Status
-                                </h2>
-
-                                <div style={{
-                                    display: 'flex',
-                                    flexWrap: 'wrap',
-                                    gap: '20px',
-                                    justifyContent: 'space-between'
-                                }}>
-                                    {renderStagnantTable('To Do', stagnantTables.todo, '#3b82f6')}
-                                    {renderStagnantTable('In Progress', stagnantTables.inProgress, '#22c55e')}
-                                    {renderStagnantTable('Review', stagnantTables.review, '#06b6d4')}
+                            <section className="stagnation" aria-labelledby="stagnation-title">
+                                <div className="analytics-header">
+                                    <div>
+                                        <h2 id="stagnation-title" className="section-title">
+                                            <Hourglass className="icon icon-sm" aria-hidden="true" /> Time in Status
+                                        </h2>
+                                        <p className="section-subtitle">Days since each open task was last updated. More than 7 days is highlighted.</p>
+                                    </div>
                                 </div>
-                            </div>
+                                <div className="stagnation-grid">
+                                    {renderStagnantTable('To Do', stagnantTables.todo, 'todo')}
+                                    {renderStagnantTable('In Progress', stagnantTables.inProgress, 'progress')}
+                                    {renderStagnantTable('Review', stagnantTables.review, 'review')}
+                                </div>
+                            </section>
                         </>
                     )}
                 </main>
         </>
+    );
+}
+
+// Bar tooltip: "<label> · <n> task(s)"
+function CountTooltip({ active, payload, label, unit }) {
+    if (!active || !payload || payload.length === 0) return null;
+    const value = payload[0].value;
+    return (
+        <div className="chart-tooltip">
+            <p className="chart-tooltip-label">{label}</p>
+            <p className="chart-tooltip-row">
+                <span className="chart-tooltip-name">Tasks</span>
+                <span className="chart-tooltip-value">{value} {value === 1 ? unit : `${unit}s`}</span>
+            </p>
+        </div>
     );
 }

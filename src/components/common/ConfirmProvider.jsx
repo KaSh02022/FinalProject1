@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import { ConfirmContext } from "./confirmContext.js";
+import { notify } from "../../utils/notify.js";
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -60,10 +61,11 @@ function ConfirmProvider({ children }) {
         try {
             await onConfirm();
             finish(true);
+            if (request.options.successMessage) notify({ type: "success", title: request.options.successMessage });
         } catch (err) {
             busyRef.current = false;
             setBusy(false);
-            setError(err?.message || "Thao tác thất bại. Vui lòng thử lại.");
+            setError(err?.message || "Something went wrong. Please try again.");
             // the buttons were disabled (focus lost): put focus back once they are enabled again
             setTimeout(() => dialogRef.current?.querySelector("[data-autofocus]")?.focus(), 0);
         }
@@ -148,14 +150,14 @@ function ConfirmProvider({ children }) {
                                         <AlertTriangle className="icon" />
                                     </span>
                                 )}
-                                <h2 id={titleId} className="modal-title">{options.title || "Xác nhận"}</h2>
+                                <h2 id={titleId} className="modal-title">{options.title || "Are you sure?"}</h2>
                             </div>
                             <button
                                 type="button"
                                 className="icon-btn"
                                 onClick={cancel}
                                 disabled={busy}
-                                aria-label="Đóng hộp thoại"
+                                aria-label="Close dialog"
                             >
                                 <X className="icon" aria-hidden="true" />
                             </button>
@@ -179,7 +181,7 @@ function ConfirmProvider({ children }) {
                                 disabled={busy}
                                 data-autofocus
                             >
-                                {options.cancelLabel || "Hủy"}
+                                {options.cancelLabel || "Cancel"}
                             </button>
                             <button
                                 type="button"
@@ -188,7 +190,7 @@ function ConfirmProvider({ children }) {
                                 disabled={busy}
                             >
                                 {busy && <Loader2 className="icon icon-sm animate-spin" aria-hidden="true" />}
-                                {busy ? "Đang xử lý…" : (options.confirmLabel || "Xác nhận")}
+                                {busy ? (options.busyLabel || "Working…") : (options.confirmLabel || "Confirm")}
                             </button>
                         </div>
                     </div>

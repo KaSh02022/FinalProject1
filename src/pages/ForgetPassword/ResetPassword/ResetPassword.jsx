@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { KanbanSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { API_BASE_URL } from "../../../config/apiConfig.js";
+import { API_BASE_URL, translateBackendMessage } from "../../../config/apiConfig.js";
 import { notify } from "../../../utils/notify.js";
 
 function ResetPassword() {
@@ -20,7 +20,7 @@ function ResetPassword() {
 
         const savedEmail = localStorage.getItem("resetPasswordEmail");
         if (!savedEmail) {
-            notify({ type: "info", title: "Phiên làm việc đã hết hạn. Vui lòng nhập lại email của bạn." });
+            notify({ type: "info", title: "Your session has expired. Please enter your email again." });
             navigate('/forgot'); 
             return;
         }
@@ -60,17 +60,17 @@ function ResetPassword() {
             const data = await res.json();
 
             if (!res.ok) {
-                throw new Error(data.message || "Failed to reset password.");
+                throw new Error(translateBackendMessage(data.message) || "Failed to reset password.");
             }
 
-            notify({ type: "success", title: "Mật khẩu của bạn đã được thay đổi thành công!" });
+            notify({ type: "success", title: "Your password has been changed." });
             
             localStorage.removeItem("resetPasswordEmail");
             navigate('/Login');
 
         } catch (error) {
             console.error("Lỗi đặt lại mật khẩu:", error);
-            setPasswordError(error.message || "Đã xảy ra lỗi. Vui lòng thử lại.");
+            setPasswordError(error.message || "Something went wrong. Please try again.");
         } finally {
             setLoading(false);
         }

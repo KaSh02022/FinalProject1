@@ -1,10 +1,12 @@
-import { ChevronDown, Plus, Search, X } from "lucide-react";
+import { CircleCheck, ChevronDown, Gauge, ListTodo, Plus, Search, X } from "lucide-react";
 
 /**
  * Board toolbar: search + week filter (the two filters the board already had), active-filter chips
  * and the "Add task" action. Purely presentational — the page owns the filter state and logic.
+ * `summary` ({ tasks, points, completed }) is the project context shown next to the action.
  */
 function BoardToolbar({
+    summary,
     searchQuery,
     onSearchChange,
     selectedWeek,
@@ -48,6 +50,14 @@ function BoardToolbar({
                         <ChevronDown className="icon icon-sm" aria-hidden="true" />
                     </div>
                 </div>
+
+                {summary && (
+                    <ul className="board-summary" aria-label="Board summary">
+                        <li title="Tasks on the board"><ListTodo className="icon icon-xs" aria-hidden="true" />{summary.tasks} {summary.tasks === 1 ? "task" : "tasks"}</li>
+                        <li title="Story points on the board"><Gauge className="icon icon-xs" aria-hidden="true" />{summary.points} pts</li>
+                        <li title="Completed tasks"><CircleCheck className="icon icon-xs" aria-hidden="true" />{summary.completed} completed</li>
+                    </ul>
+                )}
 
                 {canCreateTask && (
                     <button type="button" className="btn btn-primary board-add-btn" onClick={onCreateTask}>

@@ -21,6 +21,7 @@ import ErrorState from '../../components/common/ErrorState.jsx';
 import { failureMessage } from '../../utils/requestState.js';
 import { avatarToneClass } from "../../utils/avatar.js";
 import { notify } from "../../utils/notify.js";
+import { buildFinancePayload } from '../../utils/projectFinance.js';
 import Modal from '../../components/common/Modal.jsx';
 
 const COLOR_OPTIONS = [
@@ -110,6 +111,8 @@ export default function Projects() {
     const [projectDesc, setProjectDesc] = useState('');
     const [projectStartDate, setProjectStartDate] = useState(todayStr);
     const [projectDueDate, setProjectDueDate] = useState('');
+    // Budget / Cost per Point as typed (strings; empty = not sent)
+    const [projectFinance, setProjectFinance] = useState({ budget: '', costPerPoint: '' });
     const [selectedColor, setSelectedColor] = useState('#4f46e5');
     const [selectedMembers, setSelectedMembers] = useState([]);
 
@@ -151,6 +154,7 @@ export default function Projects() {
         setProjectDesc('');
         setProjectStartDate(currentToday);
         setProjectDueDate('');
+        setProjectFinance({ budget: '', costPerPoint: '' });
         setSelectedColor('#4f46e5');
         setSelectedMembers([]);
     };
@@ -253,7 +257,7 @@ export default function Projects() {
             setMembers(list);
         } catch (error) {
             console.error("Lỗi fetch members:", error);
-            showToast('Lỗi', 'Không thể tải danh sách Members.', 'error');
+            showToast('Error', 'The member list could not be loaded.', 'error');
         } finally {
             setLoadingMembers(false);
         }
@@ -311,17 +315,23 @@ export default function Projects() {
         const currentToday = getTodayString();
 
         if (projectStartDate && projectStartDate < currentToday) {
-            showToast('Lỗi', 'Start date không được là ngày trong quá khứ.', 'error');
+            showToast('Error', 'The start date cannot be in the past.', 'error');
             return;
         }
 
         if (projectDueDate && projectDueDate < currentToday) {
-            showToast('Lỗi', 'End date không được là ngày trong quá khứ.', 'error');
+            showToast('Error', 'The end date cannot be in the past.', 'error');
             return;
         }
 
         if (projectStartDate && projectDueDate && projectStartDate > projectDueDate) {
-            showToast('Lỗi', 'Start date không được sau End date.', 'error');
+            showToast('Error', 'The start date cannot be after the end date.', 'error');
+            return;
+        }
+
+        const finance = buildFinancePayload(projectFinance);
+        if (finance.error) {
+            showToast('Error', finance.error, 'error');
             return;
         }
 
@@ -342,17 +352,18 @@ export default function Projects() {
                 userId: currentUserId,
                 startDate: projectStartDate || currentToday,
                 date: projectDueDate || currentToday,
-                assignees: validAssignees
+                assignees: validAssignees,
+                ...finance.payload
             };
 
             await createProject(payload);
 
-            showToast('Project created', 'Project đã lưu thành công.', 'success');
+            showToast('Project created', 'The project has been saved.', 'success');
             closeModal();
             loadProjects();
         } catch (error) {
             console.error("Lỗi tạo Project:", error);
-            showToast('Lỗi', error.response?.data?.message || error.message || 'Không thể tạo project.', 'error');
+            showToast('Error', error.message || 'The project could not be created.', 'error');
         } finally {
             setIsSubmittingProject(false);
         }
@@ -363,7 +374,7 @@ export default function Projects() {
         const currentToday = getTodayString();
 
         if (taskDueDate && taskDueDate < currentToday) {
-            showToast('Lỗi', 'End date không được là ngày trong quá khứ.', 'error');
+            showToast('Error', 'The end date cannot be in the past.', 'error');
             return;
         }
 
@@ -376,13 +387,13 @@ export default function Projects() {
                 priority: taskPriority,
                 dueDate: taskDueDate
             });
-            showToast('Task created', 'Task mới đã tạo thành công.', 'success');
+            showToast('Task created', 'The new task has been created.', 'success');
             setTaskTitle('');
             setTaskDueDate('');
             setActiveModal(null);
             loadProjects();
         } catch (error) {
-            showToast('Lỗi', 'Không thể tạo task.', 'error');
+            showToast('Error', 'The task could not be created.', 'error');
         } finally {
             setIsSubmittingTask(false);
         }
@@ -559,7 +570,7 @@ export default function Projects() {
                                                     <span className="icon-inline">
                                                         <CalendarClock className="icon icon-sm" />
                                                         {(project.date || project.dueDate)
-                                                            ? new Date(project.date || project.dueDate).toLocaleDateString('vi-VN')
+                                                            ? new Date(project.date || project.dueDate).toLocaleDateString('en-GB')
                                                             : 'N/A'}
                                                     </span>
                                                 </span>
@@ -631,7 +642,7 @@ export default function Projects() {
                                                 const val = e.target.value;
                                                 const currentToday = getTodayString();
                                                 if (val && val < currentToday) {
-                                                    showToast('Lỗi', 'End date không được là ngày trong quá khứ.', 'error');
+                                                    showToast('Error', 'The end date cannot be in the past.', 'error');
                                                     setTaskDueDate(currentToday);
                                                 } else {
                                                     setTaskDueDate(val);
@@ -698,7 +709,7 @@ export default function Projects() {
                                                 const val = e.target.value;
                                                 const currentToday = getTodayString();
                                                 if (val && val < currentToday) {
-                                                    showToast('Lỗi', 'Start date không được là ngày trong quá khứ.', 'error');
+                                                    showToast('Error', 'The start date cannot be in the past.', 'error');
                                                     setProjectStartDate(currentToday);
                                                 } else {
                                                     setProjectStartDate(val);
@@ -717,7 +728,7 @@ export default function Projects() {
                                                 const val = e.target.value;
                                                 const minAllowed = projectStartDate || getTodayString();
                                                 if (val && val < minAllowed) {
-                                                    showToast('Lỗi', 'End date không được nhỏ hơn Start date hoặc ngày hiện tại.', 'error');
+                                                    showToast('Error', 'The end date cannot be before the start date or today.', 'error');
                                                     setProjectDueDate(minAllowed);
                                                 } else {
                                                     setProjectDueDate(val);
@@ -726,6 +737,36 @@ export default function Projects() {
                                         />
                                     </div>
                                 </div>
+
+                                <div className="grid-2">
+                                    <div className="field">
+                                        <label className="field-label" htmlFor="new-project-budget">Budget</label>
+                                        <input id="new-project-budget"
+                                            className="input"
+                                            type="number"
+                                            min="0"
+                                            step="any"
+                                            inputMode="decimal"
+                                            placeholder="0"
+                                            value={projectFinance.budget}
+                                            onChange={(e) => setProjectFinance({ ...projectFinance, budget: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="field">
+                                        <label className="field-label" htmlFor="new-project-cost-per-point">Cost per Point</label>
+                                        <input id="new-project-cost-per-point"
+                                            className="input"
+                                            type="number"
+                                            min="0"
+                                            step="any"
+                                            inputMode="decimal"
+                                            placeholder="0"
+                                            value={projectFinance.costPerPoint}
+                                            onChange={(e) => setProjectFinance({ ...projectFinance, costPerPoint: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                                <p className="field-hint">Optional. Numbers of 0 or more; leave empty to use 0.</p>
 
                                 <div className="field">
                                     <span className="field-label" id="new-project-color">Color</span>

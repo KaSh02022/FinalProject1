@@ -23,9 +23,10 @@ import { API_BASE_URL } from "../../config/apiConfig.js";
 
 import ProjectHeader from '../../components/project/ProjectHeader.jsx';
 import Modal from '../../components/common/Modal.jsx';
+import { useConfirm, deleteConfirm } from '../../components/common/confirmContext.js';
 
 // Helper function format ngày dạng DD/MM/YYYY
-const formatDate = (dateString, fallback = 'Chưa đặt') => {
+const formatDate = (dateString, fallback = 'Not set') => {
     if (!dateString) return fallback;
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return fallback;
@@ -51,6 +52,7 @@ export default function ProjectList() {
     // Requests that failed in the last load (empty = everything loaded)
     const [loadFailures, setLoadFailures] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const confirm = useConfirm();
 
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [newTaskPriority, setNewTaskPriority] = useState('Medium');
@@ -304,6 +306,20 @@ export default function ProjectList() {
         }
     };
 
+    // Backlog "Delete" button: confirm first, then DELETE /task/:id; the row stays if the request fails
+    const handleDeleteTask = async (taskId) => {
+        if (!isManager) return;
+        const task = tasks.find(t => String(t._id || t.id) === String(taskId));
+        await confirm(deleteConfirm({
+            item: 'task',
+            name: task?.title,
+            onConfirm: async () => {
+                await deleteTask(taskId);
+                setTasks(prev => prev.filter(t => String(t._id || t.id) !== String(taskId)));
+            },
+        }));
+    };
+
     // Định dạng ngày bắt đầu và ngày kết thúc theo chuẩn DD/MM/YYYY
     const formattedStartDate = formatDate(project?.startDate || project?.start_date || project?.createdAt);
     const formattedDueDate = formatDate(project?.date || project?.dueDate || project?.endDate);
@@ -431,6 +447,8 @@ export default function ProjectList() {
 
                                                             {isManager && (
                                                                 <button
+                                                                    type="button"
+                                                                    aria-label={`Delete task ${task.title || ''}`.trim()}
                                                                     onClick={() => handleDeleteTask(taskId)}
                                                                     className="btn btn-danger btn-sm"
                                                                     style={{

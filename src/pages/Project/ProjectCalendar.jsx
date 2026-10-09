@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import ErrorState from '../../components/common/ErrorState.jsx';
-import { useConfirm } from '../../components/common/confirmContext.js';
+import { useConfirm, deleteConfirm } from '../../components/common/confirmContext.js';
 import Modal from '../../components/common/Modal.jsx';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 
@@ -272,10 +272,8 @@ export default function ProjectCalendar() {
         e.stopPropagation();
         if (!isManager) return;
 
-        await confirm({
-            title: 'Delete task?',
-            message: 'Are you sure you want to delete this task?',
-            tone: 'danger',
+        await confirm(deleteConfirm({
+            item: 'task',
             // same optimistic remove + reload on failure as before; the dialog also shows the error
             onConfirm: async () => {
                 try {
@@ -287,7 +285,7 @@ export default function ProjectCalendar() {
                     throw err;
                 }
             },
-        });
+        }));
     };
 
     // --- XỬ LÝ NOTE (KIỂM TRA QUYỀN canManageNote) ---
@@ -330,10 +328,8 @@ export default function ProjectCalendar() {
         e.stopPropagation();
         if (!canManageNote) return;
 
-        await confirm({
-            title: 'Delete note?',
-            message: 'Are you sure you want to delete this note?',
-            tone: 'danger',
+        await confirm(deleteConfirm({
+            item: 'note',
             onConfirm: async () => {
                 try {
                     setNotes(prev => prev.filter(n => String(n._id || n.id) !== String(noteId)));
@@ -344,7 +340,7 @@ export default function ProjectCalendar() {
                     throw err;
                 }
             },
-        });
+        }));
     };
 
     // --- CALENDAR GRID COMPUTATION ---
@@ -656,17 +652,17 @@ export default function ProjectCalendar() {
                                             aria-label="Note content"
                                             value={noteContent}
                                             onChange={(e) => setNoteContent(e.target.value)}
-                                            placeholder="Nhập nội dung ghi chú..."
+                                            placeholder="Write a note…"
                                             rows={3}
                                             required
                                         />
                                     </div>
                                     <div className="modal-footer">
                                         <button type="button" onClick={() => setActiveModal(null)} className="btn btn-secondary btn-sm">
-                                            Hủy
+                                            Cancel
                                         </button>
                                         <button type="submit" disabled={isSubmittingNote} className="btn btn-primary btn-sm">
-                                            {isSubmittingNote ? <Loader2 className="animate-spin" size={14} aria-label="Saving" /> : 'Lưu ghi chú'}
+                                            {isSubmittingNote ? <Loader2 className="animate-spin" size={14} aria-label="Saving" /> : 'Save note'}
                                         </button>
                                     </div>
                                 </form>

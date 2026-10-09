@@ -32,7 +32,7 @@ function AdminUsers() {
     useEffect(() => {
         fetch(`${API_BASE_URL}/user`)
             .then((res) => {
-                if (!res.ok) throw new Error(`Lỗi ${res.status}: Không thể tải danh sách người dùng`);
+                if (!res.ok) throw new Error(`Error ${res.status}: the user list could not be loaded.`);
                 return res.json();
             })
             .then((data) => setUsers(data))

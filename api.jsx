@@ -10,7 +10,7 @@ const handleResponse = async (res) => {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             // the page reloads right after: show the message on /login instead of a blocking alert
-            queueNotice({ type: 'error', title: 'Tài khoản của bạn đã bị khóa bởi Quản trị viên!' });
+            queueNotice({ type: 'error', title: 'Your account has been suspended by an administrator.' });
             window.location.href = '/login';
             throw new Error('Account banned');
         }
@@ -189,6 +189,15 @@ export const fetchEpicBurndown = async (projectId) => {
     return handleResponse(res);
 };
 
+// Plan vs. Real Progress (cumulative, burn-up) of one project:
+// { success, currentProjectWeek, maxProjectWeek, weeks } — a different contract from the Epic Burndown
+export const fetchWeeklyExpectancy = async (projectId) => {
+    const res = await fetch(`${API_BASE_URL}/task/project/${encodeURIComponent(projectId)}/weekly-expectancy`, {
+        headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+};
+
 export const fetchTaskById = async (taskId) => {
     const res = await fetch(`${API_BASE_URL}/task/${taskId}`, {
         headers: getAuthHeaders()
@@ -300,14 +309,7 @@ export const register = async (userData) => {
     return handleResponse(res);
 };
 
-export const reviewTask = async (taskId, isAccepted) => {
-    const res = await fetch(`${API_BASE_URL}/task/${taskId}/review`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ action: isAccepted ? 'accept' : 'not_accept' })
-    });
-    return handleResponse(res);
-};
+// POST /task/:id/review is not mounted by the backend (reviewTask has no route) — intentionally no client function
 
 // ==================== NOTES ====================
 
@@ -345,24 +347,23 @@ export const updateUserStatus = async (userId, status) => {
 };
 
 // Thêm vào api.jsx của bạn
+// Both go through handleResponse like every other call: a failed request throws (the UI keeps its data
+// and shows the error) instead of being read as a success.
 export const updateProjectDetail = async (projectId, projectDetail) => {
-    const token = localStorage.getItem('token');
     const response = await fetch(`${API_BASE_URL}/project/${projectId}/project-detail`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-
         body: JSON.stringify({ projectDetail })
     });
-    return response.json();
+    return handleResponse(response);
 };
 
 export const deleteProjectDocument = async (projectId, documentId) => {
-    const token = localStorage.getItem('token');
     const response = await fetch(`${API_BASE_URL}/project/${projectId}/documents/${documentId}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
     });
-    return response.json();
+    return handleResponse(response);
 };
 
 // api.jsx

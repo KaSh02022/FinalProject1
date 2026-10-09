@@ -1,7 +1,7 @@
 import { KanbanSquare } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { API_BASE_URL } from "../../config/apiConfig.js";
+import { API_BASE_URL, translateBackendMessage } from "../../config/apiConfig.js";
 
 function ForgetPassword(){
     const [email, setEmail] = useState("");
@@ -15,7 +15,7 @@ function ForgetPassword(){
         setErrorMessage(""); 
 
         if (!email.trim()) {
-            setErrorMessage("Vui lòng nhập Email!");
+            setErrorMessage("Please enter your email.");
             return;
         }
 
@@ -33,7 +33,7 @@ function ForgetPassword(){
             const data = await res.json();
 
             if (!res.ok) {
-                throw new Error(data.message || "Xác thực email thất bại!");
+                throw new Error(translateBackendMessage(data.message) || "Email verification failed.");
             }
 
             localStorage.setItem("resetPasswordEmail", email);            
@@ -41,7 +41,7 @@ function ForgetPassword(){
 
         } catch (error) {
             console.error("Lỗi quên mật khẩu:", error);
-            setErrorMessage(error.message || "Không thể kết nối đến máy chủ.");
+            setErrorMessage(error.message || "Could not reach the server.");
         } finally {
             setLoading(false);
         }

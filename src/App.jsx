@@ -34,7 +34,7 @@ function App() {
 
             // Nếu user đăng nhập trùng khớp với userId bị ban
             if (currentUserId && currentUserId === data.userId) {
-                notify({ type: "error", title: "Tài khoản của bạn đã bị vô hiệu hóa bởi Quản trị viên." });
+                notify({ type: "error", title: "Your account has been deactivated by an administrator." });
 
                 // Xóa thông tin đăng nhập
                 localStorage.removeItem("user");

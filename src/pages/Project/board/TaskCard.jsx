@@ -1,12 +1,12 @@
-import { CalendarDays, CircleAlert, Clock, Gauge, ListChecks, X } from "lucide-react";
+import { CalendarDays, CircleAlert, CircleCheck, Clock, Gauge, ListChecks, X } from "lucide-react";
 import { avatarToneClass } from "../../../utils/avatar.js";
 
 const MAX_AVATARS = 3;
 
 // Only abnormal deadline states get a visual signal ("On Track" shows nothing — DEC-002)
 const DEADLINE_SIGNAL = {
-    Overdue: { className: "is-overdue", Icon: CircleAlert, tooltip: "Task đã quá hạn dự án" },
-    Expiring: { className: "is-expiring", Icon: Clock, tooltip: "Task sắp hết hạn tuần" },
+    Overdue: { className: "is-overdue", Icon: CircleAlert, tooltip: "The project due date has passed" },
+    Expiring: { className: "is-expiring", Icon: Clock, tooltip: "This week ends soon" },
 };
 
 /**
@@ -26,6 +26,8 @@ const DEADLINE_SIGNAL = {
  * @param {Array}    assignees       [{ id, name, initials }]
  * @param {Function} onOpen          open the task drawer
  * @param {Function} [onNotAccept]   leader/manager "Not accept" action; omit to hide the button
+ *
+ * "Completed" comes from the backend task.status (set by PUT /task/:id/move), never from the column name.
  */
 function TaskCard({ task, dragRef, draggableProps, dragHandleProps, isDragging, canDrag, week, points, deadlineStatus, assignees, onOpen, onNotAccept }) {
     const title = task.title || task.name;
@@ -33,7 +35,9 @@ function TaskCard({ task, dragRef, draggableProps, dragHandleProps, isDragging, 
     const description = (task.description || "").trim();
     const checklist = Array.isArray(task.checklist) ? task.checklist : [];
     const checklistDone = checklist.filter((item) => item.completed).length;
-    const signal = DEADLINE_SIGNAL[deadlineStatus];
+    const completed = task.status === "completed";
+    // a finished task is not late: no deadline warning on it
+    const signal = completed ? undefined : DEADLINE_SIGNAL[deadlineStatus];
     const shownAssignees = assignees.slice(0, MAX_AVATARS);
     const hiddenAssignees = assignees.length - shownAssignees.length;
 
@@ -48,6 +52,7 @@ function TaskCard({ task, dragRef, draggableProps, dragHandleProps, isDragging, 
 
     const accessibleName = [
         title,
+        completed && "Completed",
         `Priority ${priority}`,
         `Week ${week}`,
         `${points} points`,
@@ -57,6 +62,7 @@ function TaskCard({ task, dragRef, draggableProps, dragHandleProps, isDragging, 
 
     const classes = ["task-card", canDrag ? "is-draggable" : "is-locked"];
     if (isDragging) classes.push("is-dragging");
+    if (completed) classes.push("is-completed");
 
     return (
         <div
@@ -74,6 +80,12 @@ function TaskCard({ task, dragRef, draggableProps, dragHandleProps, isDragging, 
         >
             <div className="task-card-head">
                 <span className={`priority-tag priority-${priority.toLowerCase()}`}>{priority}</span>
+                {completed && (
+                    <span className="task-card-done" title="Completed">
+                        <CircleCheck className="icon icon-xs" aria-hidden="true" />
+                        Completed
+                    </span>
+                )}
             </div>
 
             <h3 className="task-card-title">{title}</h3>

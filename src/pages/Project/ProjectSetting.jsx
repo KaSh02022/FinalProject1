@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ErrorState from '../../components/common/ErrorState.jsx';
-import { useConfirm } from '../../components/common/confirmContext.js';
+import { useConfirm, deleteConfirm, removeMemberConfirm } from '../../components/common/confirmContext.js';
 import { notify } from '../../utils/notify.js';
 import Modal from '../../components/common/Modal.jsx';
+import { buildFinancePayload, toNumberInput } from '../../utils/projectFinance.js';
 import { withFallback, failureMessage } from '../../utils/requestState.js';
 
 import {
@@ -26,7 +27,7 @@ import {
     inviteMember,
     deleteMemberByProject
 } from '../../../api';
-import { API_BASE_URL } from "../../config/apiConfig.js";
+import { API_BASE_URL, translateBackendMessage } from "../../config/apiConfig.js";
 
 import ProjectHeader from '../../components/project/ProjectHeader.jsx';
 
@@ -41,9 +42,9 @@ const getTodayString = () => {
 
 // Hàm bổ trợ định dạng ngày dạng DD/MM/YYYY
 const formatDateDMY = (dateValue) => {
-    if (!dateValue) return 'Chưa đặt';
+    if (!dateValue) return 'Not set';
     const d = new Date(dateValue);
-    if (isNaN(d.getTime())) return 'Chưa đặt';
+    if (isNaN(d.getTime())) return 'Not set';
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
@@ -52,13 +53,13 @@ const formatDateDMY = (dateValue) => {
 
 // Helper tính các tuần của dự án dựa trên startDate và dueDate
 const calculateProjectWeeks = (startDateStr, endDateStr) => {
-    if (!startDateStr || !endDateStr) return [{ index: 1, label: 'Tuần 1' }];
+    if (!startDateStr || !endDateStr) return [{ index: 1, label: 'Week 1' }];
 
     const start = new Date(startDateStr);
     const end = new Date(endDateStr);
 
     if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
-        return [{ index: 1, label: 'Tuần 1' }];
+        return [{ index: 1, label: 'Week 1' }];
     }
 
     const weeks = [];
@@ -89,7 +90,7 @@ const calculateProjectWeeks = (startDateStr, endDateStr) => {
         index++;
     }
 
-    return weeks.length > 0 ? weeks : [{ index: 1, label: 'Tuần 1' }];
+    return weeks.length > 0 ? weeks : [{ index: 1, label: 'Week 1' }];
 };
 
 export default function ProjectSetting() {
@@ -106,7 +107,9 @@ export default function ProjectSetting() {
         description: '',
         color: '#4f46e5',
         startDate: '',
-        dueDate: ''
+        dueDate: '',
+        budget: '',
+        costPerPoint: ''
     });
 
     const [projectMembers, setProjectMembers] = useState([]);
@@ -240,7 +243,9 @@ export default function ProjectSetting() {
                 description: realProject.description || realProject.desc || '',
                 color: realProject.color || '#4f46e5',
                 startDate: formattedStartDate,
-                dueDate: formattedDueDate
+                dueDate: formattedDueDate,
+                budget: toNumberInput(realProject.budget),
+                costPerPoint: toNumberInput(realProject.costPerPoint)
             });
 
             setProjectMembers(realMembers);
@@ -279,7 +284,7 @@ export default function ProjectSetting() {
 
             const data = await res.json();
             if (!res.ok) {
-                throw new Error(data.message || "Cập nhật thất bại");
+                throw new Error(translateBackendMessage(data.message) || "The update failed.");
             }
 
             setProjectMembers((prevMembers) =>
@@ -292,10 +297,8 @@ export default function ProjectSetting() {
     };
 
     const handleDeleteMember = async (member) => {
-        await confirm({
-            title: "Xóa thành viên?",
-            message: "Bạn có chắc chắn muốn xóa thành viên này khỏi dự án?",
-            tone: "danger",
+        await confirm(removeMemberConfirm({
+            name: member.userId?.username || member.username || member.userId?.email || member.email,
             // same request and success handling; a failure is now shown in the dialog (was console only)
             onConfirm: async () => {
                 try {
@@ -307,11 +310,11 @@ export default function ProjectSetting() {
 
                     setDropDown(null);
                 } catch (error) {
-                    console.error("Lỗi xóa member:", error);
+                    console.error("Removing the member failed:", error);
                     throw error;
                 }
             },
-        });
+        }));
     };
 
     const handleInvite = async () => {
@@ -387,20 +390,27 @@ export default function ProjectSetting() {
         const currentToday = getTodayString();
 
         if (formData.startDate && formData.startDate < currentToday) {
-            notify({ type: 'error', title: 'Start date không được là ngày trong quá khứ!' });
+            notify({ type: 'error', title: 'The start date cannot be in the past.' });
             return;
         }
 
         if (formData.dueDate && formData.dueDate < currentToday) {
-            notify({ type: 'error', title: 'End date không được là ngày trong quá khứ!' });
+            notify({ type: 'error', title: 'The end date cannot be in the past.' });
             return;
         }
 
         if (formData.startDate && formData.dueDate) {
             if (formData.startDate > formData.dueDate) {
-                notify({ type: 'error', title: 'Start date không thể sau End date!' });
+                notify({ type: 'error', title: 'The start date cannot be after the end date.' });
                 return;
             }
+        }
+
+        // empty Budget / Cost per Point = keep the stored value (PUT ignores fields that are not sent)
+        const finance = buildFinancePayload(formData);
+        if (finance.error) {
+            notify({ type: 'error', title: finance.error });
+            return;
         }
 
         try {
@@ -411,11 +421,12 @@ export default function ProjectSetting() {
                 description: formData.description.trim(),
                 color: formData.color,
                 startDate: formData.startDate ? new Date(formData.startDate).toISOString() : null,
-                dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null
+                dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
+                ...finance.payload
             };
 
             const res = await updateProject(projectId, payload);
-            const updatedData = res?.data || res || {};
+            const updatedProject = res?.project || res?.data || {};
 
             setProject(prev => ({
                 ...prev,
@@ -423,11 +434,22 @@ export default function ProjectSetting() {
                 date: payload.dueDate,
                 endDate: payload.dueDate,
                 start_date: payload.startDate,
-                ...updatedData
+                ...updatedProject
             }));
-
+            setFormData(prev => ({
+                ...prev,
+                budget: toNumberInput(updatedProject.budget ?? finance.payload.budget),
+                costPerPoint: toNumberInput(updatedProject.costPerPoint ?? finance.payload.costPerPoint)
+            }));
+            notify({ type: 'success', title: 'Project settings saved' });
         } catch (err) {
-            console.error('Lỗi khi lưu thông tin chung:', err);
+            console.error('Saving the project settings failed:', err);
+            // 400 "No changes detected" is the backend's answer when nothing changed — not a failure
+            if (err?.status === 400 && /no changes/i.test(err.message || '')) {
+                notify({ type: 'info', title: 'No changes to save' });
+            } else {
+                notify({ type: 'error', title: "Couldn't save the project settings", message: err?.message });
+            }
         } finally {
             setSaving(false);
         }
@@ -436,20 +458,19 @@ export default function ProjectSetting() {
     const handleDeleteProject = async () => {
         if (!canDelete) return;
 
-        await confirm({
-            title: 'Xóa dự án?',
-            message: 'Bạn có chắc chắn muốn xóa dự án này không? Hành động này không thể hoàn tác.',
-            tone: 'danger',
+        await confirm(deleteConfirm({
+            item: 'project',
+            name: project?.name,
             onConfirm: async () => {
                 try {
                     await deleteProject(projectId);
                     navigate('/dashboard');
                 } catch (err) {
-                    console.error('Lỗi khi xóa dự án:', err);
+                    console.error('Deleting the project failed:', err);
                     throw err;
                 }
             },
-        });
+        }));
     };
 
     // Định dạng hiển thị ngày trên Header theo chuẩn DD/MM/YYYY
@@ -596,7 +617,7 @@ export default function ProjectSetting() {
                                                             const val = e.target.value;
                                                             const currentToday = getTodayString();
                                                             if (val && val < currentToday) {
-                                                                notify({ type: 'error', title: 'Start date không được là ngày trong quá khứ!' });
+                                                                notify({ type: 'error', title: 'The start date cannot be in the past.' });
                                                                 setFormData({ ...formData, startDate: currentToday });
                                                             } else {
                                                                 setFormData({ ...formData, startDate: val });
@@ -617,7 +638,7 @@ export default function ProjectSetting() {
                                                             const val = e.target.value;
                                                             const minAllowed = formData.startDate || getTodayString();
                                                             if (val && val < minAllowed) {
-                                                                notify({ type: 'error', title: 'End date không được nhỏ hơn Start date hoặc ngày hiện tại!' });
+                                                                notify({ type: 'error', title: 'The end date cannot be before the start date or today.' });
                                                                 setFormData({ ...formData, dueDate: minAllowed });
                                                             } else {
                                                                 setFormData({ ...formData, dueDate: val });
@@ -628,6 +649,40 @@ export default function ProjectSetting() {
                                                     />
                                                 </div>
                                             </div>
+
+                                                    <div className="grid-2">
+                                                        <div className="field">
+                                                            <label className="field-label" htmlFor="settings-budget">Budget</label>
+                                                            <input id="settings-budget"
+                                                                className="input"
+                                                                type="number"
+                                                                min="0"
+                                                                step="any"
+                                                                inputMode="decimal"
+                                                                placeholder="0"
+                                                                value={formData.budget}
+                                                                onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                                                                disabled={!canManage}
+                                                                style={disabledInputStyle}
+                                                            />
+                                                        </div>
+                                                        <div className="field">
+                                                            <label className="field-label" htmlFor="settings-cost-per-point">Cost per Point</label>
+                                                            <input id="settings-cost-per-point"
+                                                                className="input"
+                                                                type="number"
+                                                                min="0"
+                                                                step="any"
+                                                                inputMode="decimal"
+                                                                placeholder="0"
+                                                                value={formData.costPerPoint}
+                                                                onChange={(e) => setFormData({ ...formData, costPerPoint: e.target.value })}
+                                                                disabled={!canManage}
+                                                                style={disabledInputStyle}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <p className="field-hint">Numbers of 0 or more. Leave a field empty to keep its current value.</p>
 
                                             {canManage && (
                                                 <div style={{ paddingTop: 'var(--space-4)', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end' }}>
@@ -722,8 +777,8 @@ export default function ProjectSetting() {
 
                                             {filteredMembers.length > 0 ? (
                                                 filteredMembers.map((m, idx) => {
-                                                    const username = m.userId?.username || m.username || m.name || "Chưa cập nhật";
-                                                    const email = m.userId?.email || m.email || "Không có email";
+                                                    const username = m.userId?.username || m.username || m.name || "Unknown user";
+                                                    const email = m.userId?.email || m.email || "No email";
                                                     const role = m.role || "Member";
                                                     const status = m.status || "Active";
 

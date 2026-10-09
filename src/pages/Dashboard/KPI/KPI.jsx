@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { FolderKanban, Loader2 } from 'lucide-react';
+import { FolderKanban, Loader2, Wallet } from 'lucide-react';
 import ErrorState from '../../../components/common/ErrorState.jsx';
 import { failureMessage } from '../../../utils/requestState.js';
 import { fetchPortfolio } from '../../../../api.jsx';
 
 /**
- * Workspace statistics from GET /project/portfolio.
- * Only "Total Projects" is shown: the same response also has `totalBudget` and `onTimeRate`, but the
- * backend never receives a budget (always 0) and counts "done" tasks by a status value it never writes
- * (always 0% / 100%) — showing them would present placeholder numbers as facts (see the master doc).
+ * Workspace statistics from GET /project/portfolio ({ totalProjects, totalBudget, onTimeRate }).
+ * Shown: Total Projects and Total Budget (projects can now store a budget — POST/PUT /project).
+ * Hidden: onTimeRate — the backend counts tasks with status "done", a value it never writes (it uses
+ * "completed"), so the rate is a placeholder, not a fact (see docs/FRONTEND_BACKEND_SYNC_IMPLEMENTATION.md).
+ * Never GET /task/project/portfolio: that route is shadowed by GET /task/project/:id on the backend.
  */
 function KPI() {
     const [portfolio, setPortfolio] = useState(null);
@@ -44,7 +45,7 @@ function KPI() {
         return (
             <div className="page-loading kpi-loading" role="status">
                 <Loader2 className="icon animate-spin" aria-hidden="true" />
-                <span>Đang tải số liệu hệ thống...</span>
+                <span>Loading workspace statistics…</span>
             </div>
         );
     }
@@ -60,6 +61,7 @@ function KPI() {
     }
 
     const totalProjects = Number(portfolio?.totalProjects);
+    const totalBudget = Number(portfolio?.totalBudget);
     // a response without the number is not a 0: show nothing rather than a made-up value
     if (!Number.isFinite(totalProjects)) return null;
 
@@ -74,6 +76,17 @@ function KPI() {
                     <p className="stat-card-value">{totalProjects}</p>
                 </div>
             </div>
+            {Number.isFinite(totalBudget) && (
+                <div className="card stat-card">
+                    <span className="stat-card-icon tone-success" aria-hidden="true">
+                        <Wallet className="icon" />
+                    </span>
+                    <div>
+                        <p className="stat-card-label">Total Budget</p>
+                        <p className="stat-card-value">{totalBudget.toLocaleString("en-US")}</p>
+                    </div>
+                </div>
+            )}
         </section>
     );
 }
